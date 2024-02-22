@@ -36,19 +36,31 @@
     > 2. **aarch64-none-linux-gnu-gcc**: This compiler is typically used for bare-metal or embedded development targeting the AArch64 architecture. It generates code that doesn't rely on any particular operating system, hence the "none" part. It's used for building programs that run directly on the hardware without an operating system, or with a minimal runtime environment.
 
     > The difference between the two lies in the target environment and the libraries they link against. The "linux" in the first compiler's name indicates it's meant for Linux-based development, while the "none" in the second compiler's name indicates it's meant for bare-metal or standalone development without an operating system.
-    - Some reference of cross-compiler[ref1](https://stackoverflow.com/questions/13797693/what-is-the-difference-between-arm-linux-gcc-and-arm-none-linux-gnueabi)[ref2](https://blog.csdn.net/gxy199902/article/details/127162898)
+    - Some reference of cross-compiler[ref1](https://stackoverflow.com/questions/13797693/what-is-the-difference-between-arm-linux-gcc-and-arm-none-linux-gnueabi) [ref2](https://blog.csdn.net/gxy199902/article/details/127162898)
 + From Object Files to ELF  
     - Use linker to generate ELF file which can be executed by program loaders(provided by OS).
     ```aarch64-linux-gnu-ld -T linker.ld -o kernel8.elf a.o```
 + From ELF to Kernel Image  
-    - Rpi3’s bootloader can’t load ELF files. Hence, you need to convert the ELF file to a raw binary image. You can use objcopy to convert ELF files to raw binary.
+    > Rpi3’s bootloader can’t load ELF files. Hence, you need to convert the ELF file to a raw binary image. You can use objcopy to convert ELF files to raw binary.
     ```aarch64-linux-gnu-objcopy -O binary kernel8.elf kernel8.img```
 + Check on QEMU  
     - Use QEMU to see the dump assembly
     ```qemu-system-aarch64 -M raspi3b -kernel kernel8.img -display none -d in_asm```
     - [Regarding the '-d'](https://unix.stackexchange.com/questions/645478/how-to-understand-qemu-d-int-flag-output)
 ---  
-## Deploy to REAL Rpi3
+## Deploy to REAL Rpi3(Working on)
++ Flash Bootable Image to SD Card
+    > To prepare a bootable image for rpi3, you have to prepare at least the following stuff.
+    > An FAT16/32 partition contains
+    > 1. Firmware for GPU.
+    > 2. Kernel image.(kernel8.img)
+    + I use the image TA provided, you can make it yourself by downloading firmware from [rpi repo](https://github.com/raspberrypi/firmware/tree/master/boot)
+        - flash TA's image to SD card.```dd if=nycuos.img of=/dev/sdb```
++ Interact with Rpi3
+    - Connect to UART to USB
+        - connect TX to RX
+        - ```screen /dev/ttyUSB0 115200```
+        > After your rpi3 powers on, you can type some letters, and your serial console should print what you just typed.
 ---  
 ## Debugging
 + Debug on QEMU
@@ -63,4 +75,4 @@
         5. ```make install```, and the gdb will be under the your/destition/dir/bin/aarch64-linux-gnu-gdb
     - Execute the aarch64-linux-gnu-gdb, then type ```file kernel8.elf``` and ```target remote :1234```
         - The remote session will stuck, you can try to type ```continue``` then ^C, you should see you're in _start (). This is due to ```wfe``` in a.S will keep waiting for event
-    - Some references: [ref1](https://blog.csdn.net/xiaoqiaoq0/article/details/109272503)[ref2](https://hackmd.io/@sysprog/gdb-example)
+    - Some references: [ref1](https://blog.csdn.net/xiaoqiaoq0/article/details/109272503) [ref2](https://hackmd.io/@sysprog/gdb-example)
