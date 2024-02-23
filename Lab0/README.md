@@ -48,7 +48,7 @@
     ```qemu-system-aarch64 -M raspi3b -kernel kernel8.img -display none -d in_asm```
     - [Regarding the '-d'](https://unix.stackexchange.com/questions/645478/how-to-understand-qemu-d-int-flag-output)
 ---  
-## Deploy to REAL Rpi3(Working on)
+## Deploy to REAL Rpi3
 + Flash Bootable Image to SD Card
     > To prepare a bootable image for rpi3, you have to prepare at least the following stuff.
     > An FAT16/32 partition contains
