@@ -9,7 +9,8 @@ _start:
   // mpidr_el1: 64 bits Multiprocessor Affinity Register
   mrs x1, mpidr_el1 // Read MPIDR_EL1 into X1
   // Gat value [2:0] which is the CPU id(it's hard to understand in official spec, it's should try to sat that if 0x0,0x1 will invidually appear when it's switch to core 0 and 1 )
-  and x1, x1, #3
+  // 0xFF should also OK?
+  and x1, x1, #0xFF
   // If it's not core 0, send to busy waiting(Compare Branch Zero?)
   // xf(b) : branches to the first found label "x" searching "forward" for "f" or "backward" for "b".(GNU specific) see:https://stackoverflow.com/questions/27353096/1b-and-1f-in-gnu-assembly
   cbz x1, 1f
@@ -44,6 +45,6 @@ halt:
 
 3:
   // jump to C code, will not return in normal scenario
-  bl kernel_main
+  bl main
   // this line is for safety to send cpu0 to busy waiting if not work properly
   b  halt

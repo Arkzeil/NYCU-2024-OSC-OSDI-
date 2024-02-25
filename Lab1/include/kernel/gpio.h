@@ -1,36 +1,60 @@
 #ifndef GPIO_H
-#define GPIO_G
+#define GPIO_H
+
+#include <stddef.h>
+#include <stdint.h>
 
 // peripheral offset of the GPIO and the UART hardware systems, as well as some of their registers.
-enum
-{
-    // The GPIO registers base address.
-    GPIO_BASE = 0x3F200000, // for raspi2 & 3, 0x20200000 for raspi1
 
-    GPPUD = (GPIO_BASE + 0x94),
-    GPPUDCLK0 = (GPIO_BASE + 0x98),
+// The GPIO registers base address.
+// Check BCM2835 section 1.2.3 
+// Check p.90 of BCM2837 doc
+#define MMIO_BASE   0x3F000000, // 0x3F200000 for raspi2 & 3, 0x20200000 for raspi1
+// GPIO Function Select n
+#define GPFSEL0     ((volatile unsigned int*)(MMIO_BASE + 0x00200000))
+#define GPFSEL1     ((volatile unsigned int*)(MMIO_BASE + 0x00200004))
+#define GPFSEL2     ((volatile unsigned int*)(MMIO_BASE + 0x00200008))
+#define GPFSEL3     ((volatile unsigned int*)(MMIO_BASE + 0x0020000C))
+#define GPFSEL4     ((volatile unsigned int*)(MMIO_BASE + 0x00200010))
+#define GPFSEL5     ((volatile unsigned int*)(MMIO_BASE + 0x00200014))
+// GPIO Pin Output Set n
+#define GPSET0      ((volatile unsigned int*)(MMIO_BASE + 0x0020001C))
+#define GPSET1      ((volatile unsigned int*)(MMIO_BASE + 0x00200020))
+// GPIO Pin Output Clear n
+#define GPCLR0      ((volatile unsigned int*)(MMIO_BASE + 0x00200028))
+#define GPCLR1      ((volatile unsigned int*)(MMIO_BASE + 0x0020002C))
+// GPIO Pin Level n
+#define GPLEV0      ((volatile unsigned int*)(MMIO_BASE + 0x00200034))
+#define GPLEV1      ((volatile unsigned int*)(MMIO_BASE + 0x00200038))
+// GPIO Pin Event Detect Status n
+#define GPEDS0      ((volatile unsigned int*)(MMIO_BASE + 0x00200040))
+#define GPEDS1      ((volatile unsigned int*)(MMIO_BASE + 0x00200044))
+// GPIO Pin Rising Edge Detect Enable n
+#define GPREN0      ((volatile unsigned int*)(MMIO_BASE + 0x0020004C))
+#define GPREN1      ((volatile unsigned int*)(MMIO_BASE + 0x00200050))
+// GPIO Pin Falling Edge Detect Enable n
+#define GPFEN0      ((volatile unsigned int*)(MMIO_BASE + 0x00200058))
+#define GPFEN1      ((volatile unsigned int*)(MMIO_BASE + 0x0020005C))
+// GPIO Pin High Detect Enable n
+#define GPHEN0      ((volatile unsigned int*)(MMIO_BASE + 0x00200064))
+#define GPHEN1      ((volatile unsigned int*)(MMIO_BASE + 0x00200068))
+// GPIO Pin Low Detect Enable
+#define GPLEN0      ((volatile unsigned int*)(MMIO_BASE + 0x00200070))
+#define GPLEN1      ((volatile unsigned int*)(MMIO_BASE + 0x00200074))
+// GPIO Pin Async. Rising Edge Detect n
+#define GPAREN0     ((volatile unsigned int*)(MMIO_BASE + 0x0020007C))
+#define GPAREN1     ((volatile unsigned int*)(MMIO_BASE + 0x00200080))
+// GPIO Pin Async. Falling Edge Detect n
+#define GPAFEN0     ((volatile unsigned int*)(MMIO_BASE + 0x00200088))
+#define GPAFEN1     ((volatile unsigned int*)(MMIO_BASE + 0x0020008C))
+// GPIO Pin Pull-up/down Enable
+#define GPPUD       ((volatile unsigned int*)(MMIO_BASE + 0x00200094))
+// GPIO Pin Pull-up/down Enable Clock n
+#define GPPUDCLK0   ((volatile unsigned int*)(MMIO_BASE + 0x00200098))
+#define GPPUDCLK1   ((volatile unsigned int*)(MMIO_BASE + 0x0020009C))
 
-    // The base address for UART.
-    UART0_BASE = 0x3F201000, // for raspi2 & 3, 0x20201000 for raspi1
+static inline void mmio_write(uint32_t reg, uint32_t data);
 
-    UART0_DR     = (UART0_BASE + 0x00),
-    UART0_RSRECR = (UART0_BASE + 0x04),
-    UART0_FR     = (UART0_BASE + 0x18),
-    UART0_ILPR   = (UART0_BASE + 0x20),
-    UART0_IBRD   = (UART0_BASE + 0x24),
-    UART0_FBRD   = (UART0_BASE + 0x28),
-    UART0_LCRH   = (UART0_BASE + 0x2C),
-    UART0_CR     = (UART0_BASE + 0x30),
-    UART0_IFLS   = (UART0_BASE + 0x34),
-    UART0_IMSC   = (UART0_BASE + 0x38),
-    UART0_RIS    = (UART0_BASE + 0x3C),
-    UART0_MIS    = (UART0_BASE + 0x40),
-    UART0_ICR    = (UART0_BASE + 0x44),
-    UART0_DMACR  = (UART0_BASE + 0x48),
-    UART0_ITCR   = (UART0_BASE + 0x80),
-    UART0_ITIP   = (UART0_BASE + 0x84),
-    UART0_ITOP   = (UART0_BASE + 0x88),
-    UART0_TDR    = (UART0_BASE + 0x8C),
-};
+static inline uint32_t mmio_read(uint32_t reg);
 
 #endif
