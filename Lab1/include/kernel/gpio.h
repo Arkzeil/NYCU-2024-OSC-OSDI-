@@ -9,7 +9,7 @@
 // The GPIO registers base address.
 // Check BCM2835 section 1.2.3 
 // Check p.90 of BCM2837 doc
-#define MMIO_BASE   0x3F000000, // 0x3F200000 for raspi2 & 3, 0x20200000 for raspi1
+#define MMIO_BASE   0x3F000000 // 0x3F200000 for raspi2 & 3, 0x20200000 for raspi1
 // GPIO Function Select n
 #define GPFSEL0     ((volatile unsigned int*)(MMIO_BASE + 0x00200000))
 #define GPFSEL1     ((volatile unsigned int*)(MMIO_BASE + 0x00200004))
@@ -53,8 +53,8 @@
 #define GPPUDCLK0   ((volatile unsigned int*)(MMIO_BASE + 0x00200098))
 #define GPPUDCLK1   ((volatile unsigned int*)(MMIO_BASE + 0x0020009C))
 
-static inline void mmio_write(uint32_t reg, uint32_t data);
+void mmio_write(unsigned int* reg, uint32_t data);
 
-static inline uint32_t mmio_read(uint32_t reg);
+uint32_t mmio_read(unsigned int* reg);
 
 #endif

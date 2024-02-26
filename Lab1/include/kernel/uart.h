@@ -1,7 +1,7 @@
 #ifndef UART_H
 #define UART_H
 
-#include "gpio.h"
+#include "kernel/gpio.h"
 
 // check p.8
 // Auxiliary Interrupt status

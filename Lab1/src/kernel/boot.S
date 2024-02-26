@@ -25,7 +25,7 @@ halt:
   // if it's cpu0
 1:  
   // Set stack pointer before code starts
-  ldr x1, _start
+  ldr x1, =_start
   mov sp, x1
 
   // clear bss

@@ -15,6 +15,7 @@ SECTIONS
   /* save the current location as '__start'*/
   /* use 'PROVIDE' to prevent double declaration error(already defined in C)*/
   PROVIDE(__start = .);
+  /*__start = .*/
 
   /* define output sections '.text' */
   /* stuffs in the curly bracket are the content to put into .text output section */
@@ -42,7 +43,7 @@ SECTIONS
   }
   PROVIDE(__data_end = .);
   /* align the section so that it starts at an address that is a multiple of 8. If the section is not aligned, it would be more difficult to use the str instruction to store 0*/
-  . = ALIGN(0x8);
+  . = ALIGN(0x16);
   
   PROVIDE(__bss_start = .);
   /* uninitialized global variable. (NOLOAD):link the program properly but must not be loaded to memory, since bss are all 0*/
@@ -59,8 +60,8 @@ SECTIONS
     *(.comment)
   }
 
-  /*calculate .bss by byte*/
-  PROVIDE(__bss_size = (__bss_end - __bss_start) >> 3);
-
   PROVIDE(__end = .);
 }
+/*calculate .bss by byte*/
+/*PROVIDE(__bss_size = (__bss_end - __bss_start) >> 3);*/
+__bss_size = (__bss_end - __bss_start) >> 3;
