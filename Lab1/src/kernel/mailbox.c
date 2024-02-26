@@ -1,2 +1,50 @@
 #include "kernel/mailbox.h"
 
+// The buffer itself is 16-byte aligned as only the upper 28 bits of the address can be passed via the mailbox.
+volatile unsigned int __attribute__((aligned(16))) mailbox[7];
+
+int mailbox_call(unsigned int *mailbox){
+    // The mailbox interface has 28 bits (MSB) available for the value and 4 bits (LSB) for the channel
+    // First take the 64bits address of mailbox(is probably just to ensure it can fits), then take the lower 32bits
+    // clear LSB 4 bits and fill with channel number.
+    unsigned int mbox_ptr = ((unsigned int)((unsigned long)&mailbox) & ~0xF) | (MAILBOX_CH_PROP & 0xF);
+
+    // Wait until the mailbox is not full
+    while((mmio_read(MAILBOX_STATUS) & MAILBOX_FULL)){
+        asm volatile("nop");
+    }
+    // write our address containing message to mailbox address
+    mmio_write(MAILBOX_WRITE, mbox_ptr);
+    // Wait for response
+    while(1){
+        // until the mailbox is not empty
+        while(mmio_read(MAILBOX_STATUS) & MAILBOX_EMPTY){
+            asm volatile("nop");
+        }
+        // if it's the response corresponded to our request
+        if(mbox_ptr == mmio_read(MAILBOX_READ)){
+            // if the response is successed
+            return mailbox[1] == REQUEST_SUCCEED;
+        }
+    }
+
+    return 0;
+}
+
+// regarding the message format:https://github.com/bztsrc/raspi3-tutorial/tree/master/04_mailboxes
+void get_board_revision(){
+
+    mailbox[0] = 7 * 4;               // buffer size in bytes (size of the message in bytes)
+    mailbox[1] = REQUEST_CODE;
+    // tags begin
+    mailbox[2] = GET_BOARD_REVISION;  // tag identifier
+    mailbox[3] = 4;                   // maximum of request and response value buffer's length.(value buffer size in bytes)
+    mailbox[4] = TAG_REQUEST_CODE;    // must be zero
+    mailbox[5] = 0;                   // (optional) value buffer
+    // tags end
+    mailbox[6] = END_TAG;             // indicates no more tags
+
+    mailbox_call(mailbox);            // message passing procedure call, you should implement it following the 6 steps provided above.
+
+    //printf("0x%x\n", mailbox[5]);     // it should be 0xa020d3 for rpi3 b+
+}

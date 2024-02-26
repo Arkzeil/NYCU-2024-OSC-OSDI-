@@ -13,15 +13,15 @@ void uart_init (void){
     *AUX_MU_IIR_REG     =   6;      // No FIFO
 
     // p.92
-    reg = mmio_read(GPFSEL1);
-    //reg = *GPFSEL1;
+    //reg = mmio_read(GPFSEL1);
+    reg = *GPFSEL1;
     // clear GPIO14,15(~7 = 000)
     reg &= ~((7<<12) | (7<<15));    // 14-12 bits are for gpio14, 17-15 are fir gpio15
     reg |= (2<<12) | (2<<15);       // Assert: set to ALT5 for mini UART, while ALT0 is for PL011 UART
     
     // set GPIO14, 15 to miniUART
-    mmio_write(GPFSEL1, reg);
-    //*GPFSEL1 = reg;
+    //mmio_write(GPFSEL1, reg);
+    *GPFSEL1 = reg;
 
     // p.101
     *GPPUD              =  0;       // Write to GPPUD to set the required control signal (i.e. Pull-up or Pull-Down or neither to remove the current Pull-up/down)
@@ -32,8 +32,8 @@ void uart_init (void){
         asm volatile("nop"); 
     }
 
-    mmio_write(GPPUDCLK0, (1 << 14) | (1 << 15));
-    //*GPPUDCLK0 = (1 << 14) | (1 << 15); // 1 = Assert Clock on line
+    //mmio_write(GPPUDCLK0, (1 << 14) | (1 << 15));
+    *GPPUDCLK0 = (1 << 14) | (1 << 15); // 1 = Assert Clock on line
 
     reg = 150;
     // Wait 150 cycles – this provides the required set-up time for the control signal
@@ -42,8 +42,8 @@ void uart_init (void){
     }
 
     // Write to GPPUDCLK0/1 to remove the clock 
-    mmio_write(GPPUDCLK0, 0);
-    //*GPPUDCLK0 = 0;
+    //mmio_write(GPPUDCLK0, 0);
+    *GPPUDCLK0 = 0;
     reg = 150;
     // Wait 150 cycles – this provides the required set-up time for the control signal
     while(reg--){
@@ -59,8 +59,8 @@ void uart_putc(unsigned char c){
         // if bit 5 is set, break and return IO_REG
     }
     //  p.11
-    mmio_write(AUX_MU_IO_REG, c);
-    //*AUX_MU_IO_REG = c;
+    //mmio_write(AUX_MU_IO_REG, c);
+    *AUX_MU_IO_REG = c;
 }
 
 unsigned char uart_getc(){
@@ -70,7 +70,8 @@ unsigned char uart_getc(){
         // if bit 0 is set, break and return IO_REG
     }
     //  p.11
-    r =  (char)(mmio_read(AUX_MU_IO_REG));
+    //r =  (char)(mmio_read(AUX_MU_IO_REG));
+    r = (char)(*AUX_MU_IO_REG);
     /* convert carriage return to newline */
     return r=='\r'?'\n':r;
 }
@@ -83,5 +84,13 @@ void uart_puts(const char* str){
         if(str[i]=='\n')
             uart_putc('\r');
         uart_putc((char)str[i]);
+    }
+}
+
+void uart_b2x(unsigned int b){
+    int i;
+    uart_puts("0x");
+    for(i = 28; i >=0; i-=4){
+        
     }
 }
