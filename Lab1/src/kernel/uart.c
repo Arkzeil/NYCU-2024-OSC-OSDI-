@@ -77,7 +77,9 @@ unsigned char uart_getc(){
 
 void uart_puts(const char* str){
     // I thought this 'for' usage can't be in C
-    for(int i = 0; str[i] != '\0'; i++){
+    //for(int i = 0; str[i] != '\0'; i++)
+    int i;
+    for(i = 0; str[i] != '\0'; i++){
         if(str[i]=='\n')
             uart_putc('\r');
         uart_putc((char)str[i]);
