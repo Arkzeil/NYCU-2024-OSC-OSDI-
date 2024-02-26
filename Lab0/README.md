@@ -74,5 +74,6 @@
         4. Use ```make -j8``` to compile
         5. ```make install```, and the gdb will be under the your/destition/dir/bin/aarch64-linux-gnu-gdb
     - Execute the aarch64-linux-gnu-gdb, then type ```file kernel8.elf``` and ```target remote :1234```
-        - The remote session will stuck, you can try to type ```continue``` then ^C, you should see you're in _start (). This is due to ```wfe``` in a.S will keep waiting for event
+        - (Not Sure)The remote session will stuck, you can try to type ```continue``` then ^C, you should see you're in _start (). This is due to ```wfe``` in a.S will keep waiting for event
+    - add ```-g``` option on both compiler and linker option to generate debugging symbol, but I still not see anything.(At least it won't tell me no debug symbol found)
     - Some references: [ref1](https://blog.csdn.net/xiaoqiaoq0/article/details/109272503) [ref2](https://hackmd.io/@sysprog/gdb-example)
