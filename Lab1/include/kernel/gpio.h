@@ -1,9 +1,6 @@
 #ifndef GPIO_H
 #define GPIO_H
 
-#include <stddef.h>
-#include <stdint.h>
-
 // peripheral offset of the GPIO and the UART hardware systems, as well as some of their registers.
 
 // The GPIO registers base address.
@@ -53,8 +50,8 @@
 #define GPPUDCLK0   ((volatile unsigned int*)(MMIO_BASE + 0x00200098))
 #define GPPUDCLK1   ((volatile unsigned int*)(MMIO_BASE + 0x0020009C))
 
-void mmio_write(unsigned int* reg, uint32_t data);
+void mmio_write(unsigned int* reg, unsigned int data);
 
-uint32_t mmio_read(unsigned int* reg);
+unsigned int mmio_read(unsigned int* reg);
 
 #endif

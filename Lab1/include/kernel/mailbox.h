@@ -2,8 +2,11 @@
 #define MAILBOX_H
 
 #include "kernel/gpio.h"
+#include "kernel/uart.h"
 
 // https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
+// Not sure how large to declare, but many length is less than 28, si I choosed 32?
+extern volatile unsigned int mailbox[32];
 
 /* channels */
 #define MAILBOX_CH_POWER   0
@@ -18,6 +21,7 @@
 
 // tags (ARM to VC)
 #define GET_BOARD_REVISION  0x00010002
+#define GET_ARM_MEMORY      0x00010005
 // buffer content
 #define REQUEST_CODE        0x00000000
 #define REQUEST_SUCCEED     0x80000000
@@ -38,5 +42,6 @@
 
 int mailbox_call();
 void get_board_revision();
+void get_arm_mem();
 
 #endif

@@ -89,8 +89,42 @@ void uart_puts(const char* str){
 
 void uart_b2x(unsigned int b){
     int i;
+    unsigned int t;
     uart_puts("0x");
+    // take [32,29] then [28,25] ...
     for(i = 28; i >=0; i-=4){
-        
+        // this is the equivalent to following method, as '0' = 0x30 and 0x37 + 10 = 'A'
+        // thus convert to ASCII
+        t = (b >> i) & 0xF;
+        t += t > 9 ? 0x37:0x30;
+        uart_putc(t);
+
+        // preserver right 4 bits info, others turned to 0
+        /*t = (b >> i) & 0xF;
+        if(t > 9){
+            switch(t){
+                case 10:
+                    uart_putc('A');
+                    break;
+                case 11:
+                    uart_putc('B');
+                    break;
+                case 12:
+                    uart_putc('C');
+                    break;
+                case 13:
+                    uart_putc('D');
+                    break;
+                case 14:
+                    uart_putc('E');
+                    break;
+                case 15:
+                    uart_putc('F');
+                    break;    
+            }
+        }
+        else{
+            uart_putc(t + '0');
+        }*/
     }
 }
