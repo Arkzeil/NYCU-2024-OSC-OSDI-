@@ -31,17 +31,19 @@ halt:
   // clear bss
   // load bss start location to x1(64bit register)
   ldr x1, =__bss_start
-  // load bss size into w1(32bit register)
-  ldr w1, =__bss_size
+  // load bss size into w2(32bit register)
+  // I used w1 and got no output when I using mailbox.
+  // This is because that the w1 will destroy x1(upper 32 bits->0, lower load the content)
+  ldr w2, =__bss_size
 // Loop until all bss set to 0
 2:
-  cbz w1, 3f
+  cbz w2, 3f
   // xzr is 64 bits zero register, write all 0 to x1 then x1 = x1 + 8
   // https://blog.csdn.net/boildoctor/article/details/123359325
   str xzr, [x1], #8
-  // sub w1 by 1 byte(8bits)
-  sub w1, w1, #1
-  cbnz w1, 2b
+  // sub w2 by 1 byte(8bits)
+  sub w2, w2, #1
+  cbnz w2, 2b
 
 3:
   // jump to C code, will not return in normal scenario
