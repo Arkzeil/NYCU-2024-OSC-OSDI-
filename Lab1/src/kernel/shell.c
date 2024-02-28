@@ -1,6 +1,7 @@
 #include "kernel/shell.h"
 #include "kernel/utils.h"
 #include "kernel/mailbox.h"
+#include "kernel/reboot.h"
 
 void my_shell(){
     char buf[MAX_BUF_LEN];
@@ -33,7 +34,7 @@ void my_shell(){
             uart_puts("Hello World!\n");
         }
         else if(!string_comp(buf, "info")){
-            uart_puts("Mailbox function is still woring on\n");
+            //uart_puts("Mailbox function is still woring on\n");
             /*if(mailbox_call()){
                 get_board_revision();
                 uart_puts("My board revision is: ");
@@ -45,6 +46,9 @@ void my_shell(){
         }
         else if(!string_comp(buf, "reboot")){
             uart_puts("Reboot function is still woring on\n");
+            uart_puts("Rebooting...\n");
+            // after 1000 ticks, start resetting
+            reset(1000);
         }
         else{
             uart_puts("Unknown Command: ");

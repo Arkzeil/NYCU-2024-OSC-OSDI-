@@ -4,25 +4,25 @@
 volatile unsigned int __attribute__((aligned(16))) mailbox[32];
 
 int mailbox_call(){
-    // The mailbox interface has 28 bits (MSB) available for the value and 4 bits (LSB) for the channel
+    // The mailbox interface has 28 bits (MSB) available for the value(message address) and 4 bits (LSB) for the channel
     // First take the 64bits address of mailbox(is probably just to ensure it can fits), then take the lower 32bits
-    // clear LSB 4 bits and fill with channel number.
+    // clear LSB 4 bits(~0xF=1111 1111 1111 1111 1111 1111 1111 0000) and fill with channel number.
     unsigned int mbox_ptr = ((unsigned int)((unsigned long)&mailbox) & ~0xF) | (MAILBOX_CH_PROP & 0xF);
 
     // Wait until the mailbox is not full
-    while((mmio_read(MAILBOX_STATUS) & MAILBOX_FULL)){
+    while((mmio_read((long)MAILBOX_STATUS) & MAILBOX_FULL)){
         asm volatile("nop");
     }
     // write our address containing message to mailbox address
-    mmio_write(MAILBOX_WRITE, mbox_ptr);
+    mmio_write((long)MAILBOX_WRITE, mbox_ptr);
     // Wait for response
     while(1){
         // until the mailbox is not empty
-        while(mmio_read(MAILBOX_STATUS) & MAILBOX_EMPTY){
+        while(mmio_read((long)MAILBOX_STATUS) & MAILBOX_EMPTY){
             asm volatile("nop");
         }
         // if it's the response corresponded to our request
-        if(mbox_ptr == mmio_read(MAILBOX_READ)){
+        if(mbox_ptr == mmio_read((long)MAILBOX_READ)){
             // if the response is successed
             return mailbox[1] == REQUEST_SUCCEED;
         }
@@ -35,7 +35,7 @@ int mailbox_call(){
 void get_board_revision(){
 
     mailbox[0] = 7 * 4;               // buffer size in bytes (size of the message in bytes)
-    mailbox[1] = REQUEST_CODE;
+    mailbox[1] = REQUEST_CODE;        // MBOX_REQUEST magic value, indicates request message
     // tags begin
     mailbox[2] = GET_BOARD_REVISION;  // tag identifier
     mailbox[3] = 4;                   // maximum of request and response value buffer's length.(value buffer size in bytes)

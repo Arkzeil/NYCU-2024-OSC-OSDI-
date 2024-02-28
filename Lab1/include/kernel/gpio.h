@@ -50,8 +50,8 @@
 #define GPPUDCLK0   ((volatile unsigned int*)(MMIO_BASE + 0x00200098))
 #define GPPUDCLK1   ((volatile unsigned int*)(MMIO_BASE + 0x0020009C))
 
-void mmio_write(unsigned int* reg, unsigned int data);
+void mmio_write(long reg, unsigned int data);
 
-unsigned int mmio_read(unsigned int* reg);
+unsigned int mmio_read(long reg);
 
 #endif
