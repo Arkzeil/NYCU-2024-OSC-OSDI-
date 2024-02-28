@@ -57,10 +57,18 @@ void uart_putc(unsigned char c){
     // 0x20 = 0010 0000
     while(!((*AUX_MU_LSR_REG) & 0x20) ){
         // if bit 5 is set, break and return IO_REG
+        asm volatile("nop");
     }
     //  p.11
     //mmio_write(AUX_MU_IO_REG, c);
     *AUX_MU_IO_REG = c;
+    // If no CR, first line of output will be moved right for n chars(n=shell command just input), not sure why
+    if(c == '\n'){
+        while(!((*AUX_MU_LSR_REG) & 0x20) ){
+            asm volatile("nop");
+        }
+        *AUX_MU_IO_REG = '\r';
+    }
 }
 
 unsigned char uart_getc(){
@@ -68,6 +76,7 @@ unsigned char uart_getc(){
     // p.15, bit 0 is set if the receive FIFO holds at least 1 symbol.
     while(!((*AUX_MU_LSR_REG) & 0x01) ){
         // if bit 0 is set, break and return IO_REG
+        asm volatile("nop");
     }
     //  p.11
     //r =  (char)(mmio_read(AUX_MU_IO_REG));
@@ -81,7 +90,7 @@ void uart_puts(const char* str){
     //for(int i = 0; str[i] != '\0'; i++)
     int i;
     for(i = 0; str[i] != '\0'; i++){
-        if(str[i]=='\n')
+        if(str[i] == '\n')
             uart_putc('\r');
         uart_putc((char)str[i]);
     }
@@ -96,7 +105,7 @@ void uart_b2x(unsigned int b){
         // this is the equivalent to following method, as '0' = 0x30 and 0x37 + 10 = 'A'
         // thus convert to ASCII
         t = (b >> i) & 0xF;
-        t += t > 9 ? 0x37:0x30;
+        t += (t > 9 ? 0x37:0x30);
         uart_putc(t);
 
         // preserver right 4 bits info, others turned to 0

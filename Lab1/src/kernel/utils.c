@@ -38,3 +38,9 @@ int string_comp(const char *str1, const char *str2){
         return 0;
     }
 }
+
+void string_set(char *str, int n, int size){
+    int i;
+    for(i = 0; i < size; i++)
+        str[i] = n;
+}
