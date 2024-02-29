@@ -18,6 +18,11 @@
         > Align the section so that it starts at an address that is a multiple of 8. If the section is not aligned, it would be more difficult to use the str instruction to store 0
         - Regarding ```COMMON```: [ref](http://swaywang.blogspot.com/2012/06/elfbss-sectioncommon-section.html)
     - Save bss size in byte for future clearing zero at .S file
+    - Regarding the ```linkonce``` in linker script, some reference:[ref1](https://stackoverflow.com/questions/5518083/what-is-a-linkonce-section) [ref2](https://blog.csdn.net/kuankuan02/article/details/91804456?spm=1001.2101.3001.6650.1&utm_medium=distribute.pc_relevant.none-task-blog-2%7Edefault%7ECTRLIST%7ERate-1-91804456-blog-125865933.235%5Ev43%5Epc_blog_bottom_relevance_base8&depth_1-utm_source=distribute.pc_relevant.none-task-blog-2%7Edefault%7ECTRLIST%7ERate-1-91804456-blog-125865933.235%5Ev43%5Epc_blog_bottom_relevance_base8&utm_relevant_index=2), and below is how GPT explain it:
+    > In a linker script, the 'linkonce' attribute is used to specify that a particular section or symbol should be included in the final linked output if it appears only once across all input files. If the section or symbol appears multiple times, the linker will include only one instance of it in the output, discarding any duplicates.
+    > This attribute is commonly used for functions or data that are defined in multiple source files but should be treated as a single entity in the final binary. For example, if a function is declared as 'linkonce', the linker will include it in the output if it is defined in only one source file. If the function is defined in multiple source files, the linker will choose one instance to include in the final binary and discard the duplicates.
+    > The 'linkonce' attribute helps prevent duplicate symbols or sections from causing linker errors or bloating the size of the final binary. It allows developers to organize their code more flexibly across multiple source files while ensuring that only necessary instances of symbols or sections are included in the linked output.
+    - Regarding COMDAT [ref](https://stackoverflow.com/questions/1834597/what-is-the-comdat-section-used-for)
 + .S file
     - Detail explaination are lied in my ```boot.S``` comments.
     ---
