@@ -37,6 +37,7 @@
         - clear BSS to all 0.
         - jump to ```main``` function in ```kernel_main.c```.
     - Regarding the register, remember w register(32bits) and x register(64bits) shared same address.
+> linker script calculates the BSS section size based on your program’s global uninitialized variables. During linking, the linker determines the actual memory addresses for _bssstart and _bssend, allowing the startup code to clear the BSS section effectively.
 ### Basic Exercise 2 - Mini UART
 [BCM2837 ARM Peripherals manual](https://github.com/raspberrypi/documentation/files/1888662/BCM2837-ARM-Peripherals.-.Revised.-.V2-1.pdf)
 > Physical addresses range from 0x3F000000 to 0x3FFFFFFF for peripherals. The bus addresses for peripherals are set up to map onto the peripheral bus address range starting at 0x7E000000. Thus a peripheral advertised here at bus address 0x7Ennnnnn is available at physical address 0x3Fnnnnnn.
