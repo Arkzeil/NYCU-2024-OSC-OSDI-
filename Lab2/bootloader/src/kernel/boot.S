@@ -6,30 +6,21 @@
 .global _start
 
 _start:
-  // only the primary core runs (core 0), and the secondary cores are awaiting in a spin loop.
-  // mpidr_el1: 64 bits Multiprocessor Affinity Register
-  mrs x1, mpidr_el1 // Read MPIDR_EL1 into X1
-  // Gat value [2:0] which is the CPU id(it's hard to understand in official spec, it's should try to sat that if 0x0,0x1 will invidually appear when it's switch to core 0 and 1 )
-  // 0xFF should also OK?
-  and x1, x1, #0xFF
-  // If it's not core 0, send to busy waiting(Compare Branch Zero?)
-  // xf(b) : branches to the first found label "x" searching "forward" for "f" or "backward" for "b".(GNU specific) see:https://stackoverflow.com/questions/27353096/1b-and-1f-in-gnu-assembly
-  cbz x1, 1f
+  mov     x10, x0
+  mov     x11, x1
+  mov     x12, x2
+  mov     x13, x3
 
-// if it's not cpu0
-halt: 
-  // Wait for event
-  // When the C function returns, it enters the halt procedure where it loops forever doing nothing.
-  wfe
-  b halt
-
-  // if it's cpu0
+// because of a change in firmware, this code will only run on the
+// BSP core, therefore there's no need to check the cpu's id. A spin-loop on a
+// non-relocated address would be otherwise bad,
 1:  
   ldr x1, =0x80000
-  ldr x2, =__bootloader_start
+  ldr x2, =_start
   ldr w3, =__bootloader_size
 
-// Since GPU always start at 0x80000, in order to run our bootloader, we first need to move out code from 0x80000 to address where linker declared(0x60000) 
+// Since GPU always start at 0x80000, in order to run our bootloader, we first need to move out code from 0x80000 to address where linker declared([_start]=0x60000) 
+// The address pointed by _start is 0x60000, this can verified by objdump
 relocate:
   ldr x4, [x1], #8
   str x4, [x2], #8
@@ -62,4 +53,4 @@ relocate:
   // jump to C code, will not return in normal scenario
   bl bootloader_main - 0x20000
   // this line is for safety to send cpu0 to busy waiting if not work properly
-  b  halt
+  b  3b

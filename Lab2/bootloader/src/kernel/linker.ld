@@ -58,7 +58,7 @@ SECTIONS
   /*‘/DISCARD/’ may be used to discard input sections. Any input sections which are assigned to an output section named ‘/DISCARD/’ are not included in the output file.*/
   /*/DISCARD/ : { *(.comment) *(.gnu*) *(.note*) *(.eh_frame*) }*/
   /DISCARD/ : {
-    *(.comment)
+    *(.comment) *(.gnu*) *(.note*) *(.eh_frame*)
   }
   /*__end = .;*/
   PROVIDE(__bootloader_end = .);
