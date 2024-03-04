@@ -39,6 +39,6 @@ struct cpio_newc_header {
 
 void cpio_parse();
 void cpio_ls();
-void cpio_cat();
+void cpio_cat(char *input);
 
 #endif

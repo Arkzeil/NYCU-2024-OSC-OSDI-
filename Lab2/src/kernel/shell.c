@@ -62,7 +62,34 @@ void my_shell(){
             cpio_ls();
         }
         else if(!string_comp(buf, "cat")){
-            uart_puts("cat is still working on\n");
+            //uart_puts("cat is still working on\n");
+            buf_index = 0;
+            string_set(buf, 0, MAX_BUF_LEN);
+            
+            uart_puts("Filename: ");
+
+            while(1){
+                input_char = uart_getc();
+                // Get non ASCII code
+                if(input_char > 127 || input_char < 0){
+                    //uart_puts("\nwarning: Get non ASCII code\n");
+                    continue;
+                }
+                if(buf_index < MAX_BUF_LEN)
+                    buf[buf_index++] = parse(input_char);
+                // should replace with parsed char
+                uart_putc(input_char);
+                // when receving ENTER
+                if(input_char == '\n'){
+                    // add EOF after '\n'
+                    buf[buf_index] = '\0';
+                    break;
+                }
+            }
+
+            cpio_cat(buf);
+
+            continue;
         }
         else{
             uart_puts("Unknown Command: ");

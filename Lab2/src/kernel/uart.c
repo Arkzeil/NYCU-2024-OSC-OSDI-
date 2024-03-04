@@ -96,6 +96,15 @@ void uart_puts(const char* str){
     }
 }
 
+void uart_puts_fixed(const char *str, int len){
+    int i;
+    for(i = 0; i < len; i++){
+        //if(str[i] == '\n')
+        //    uart_putc('\r');
+        uart_putc((char)str[i]);
+    }
+}
+
 void uart_b2x(unsigned int b){
     int i;
     unsigned int t;

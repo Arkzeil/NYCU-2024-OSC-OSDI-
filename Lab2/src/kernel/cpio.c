@@ -23,14 +23,14 @@ void cpio_ls(){
         namesize = h2i(header->c_namesize, 8);
         filesize = h2i(header->c_filesize, 8);
 
-        uart_b2x(namesize);
+        /*uart_b2x(namesize);
         uart_putc('\n');
         uart_b2x(filesize);
-        uart_putc('\n');
+        uart_putc('\n');*/
 
         uart_puts((char*)(temp_addr + sizeof(struct cpio_newc_header)));
         uart_putc('\n');
-        uart_puts("----------------\n");
+        //uart_puts("----------------\n");
         // followed  by NUL bytes so that the total size of the fixed header plus pathname is a multiple of four
         // the file data is padded to a multiple of four bytes.
         // (4-size%4) can get right value if size%4 != 0, so mod again to eliminate 0(if size%4 = 0, padding should be 0 instead of 4)
@@ -38,12 +38,36 @@ void cpio_ls(){
     }
 }
 
-void cpio_cat(){
-    /*struct cpio_newc_header* header = (struct cpio_newc_header*)cpio_addr;
+void cpio_cat(char *input){
+    char *temp_addr = cpio_addr;
+    struct cpio_newc_header* header = (struct cpio_newc_header*)temp_addr;
 
-    int namesize = h2i(header->c_namesize, 8);
-    int filesize = h2i(header->c_filesize, 8);
+    int namesize;
+    int filesize;
 
-    uart_puts((char*)(cpio_addr + sizeof(struct cpio_newc_header)) + namesize);
-    uart_putc('\n');*/
+    while(string_comp((char*)(temp_addr + sizeof(struct cpio_newc_header)), "TRAILER!!!") != 0){
+        header = (struct cpio_newc_header*)temp_addr;
+        namesize = h2i(header->c_namesize, 8);
+        filesize = h2i(header->c_filesize, 8);
+
+        if(!string_comp((char*)(temp_addr + sizeof(struct cpio_newc_header)), input)){
+            //uart_b2x(filesize);
+            //uart_putc('\n');
+            if(filesize == 0){
+                //uart_puts(input);
+                uart_puts("Is a directory\n");
+            }
+            else{
+                uart_puts((char*)(temp_addr + sizeof(struct cpio_newc_header) + namesize + ((4 - ((sizeof(struct cpio_newc_header) + namesize)%4) ) % 4) ));
+                //uart_puts_fixed((char*)(temp_addr + sizeof(struct cpio_newc_header) + namesize + ((4 - ((sizeof(struct cpio_newc_header) + namesize)%4) ) % 4) ), filesize);
+                //uart_putc('\n');
+            }
+            return;
+        }
+
+        temp_addr += (sizeof(struct cpio_newc_header) + namesize + filesize + ((4 - ((sizeof(struct cpio_newc_header) + namesize)%4) ) % 4) + ((4 - (filesize%4)) % 4));
+    }
+    
+    //uart_puts(input);
+    uart_puts("No such file or directory\n");
 }
