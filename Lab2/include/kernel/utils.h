@@ -14,5 +14,7 @@ int string_comp_l(const char *str1, const char *str2, int len);
 void string_set(char *str, int n, int size);
 // used for cpio length conversion(hex->int dec), it needs string length 
 int h2i(const char *str, int len); 
+// return a offset value to let i aligned to 'align' format
+int align_offset(unsigned int i, unsigned int align);
 
 #endif

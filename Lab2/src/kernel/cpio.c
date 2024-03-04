@@ -2,10 +2,6 @@
 #include "kernel/utils.h"
 #include "kernel/uart.h"
 
-void cpio_parse(struct cpio_newc_header *result){
-    
-}
-
 void cpio_ls(){
     // a temp address used for ls function
     char *temp_addr = cpio_addr;
@@ -34,7 +30,7 @@ void cpio_ls(){
         // followed  by NUL bytes so that the total size of the fixed header plus pathname is a multiple of four
         // the file data is padded to a multiple of four bytes.
         // (4-size%4) can get right value if size%4 != 0, so mod again to eliminate 0(if size%4 = 0, padding should be 0 instead of 4)
-        temp_addr += (sizeof(struct cpio_newc_header) + namesize + filesize + ((4 - ((sizeof(struct cpio_newc_header) + namesize)%4) ) % 4) + ((4 - (filesize%4)) % 4));
+        temp_addr += (sizeof(struct cpio_newc_header) + namesize + filesize + align_offset((sizeof(struct cpio_newc_header) + namesize), 4) +align_offset(filesize, 4));
     }
 }
 
@@ -58,14 +54,14 @@ void cpio_cat(char *input){
                 uart_puts("Is a directory\n");
             }
             else{
-                uart_puts((char*)(temp_addr + sizeof(struct cpio_newc_header) + namesize + ((4 - ((sizeof(struct cpio_newc_header) + namesize)%4) ) % 4) ));
+                uart_puts((char*)(temp_addr + sizeof(struct cpio_newc_header) + namesize + align_offset((sizeof(struct cpio_newc_header) + namesize), 4) ));
                 //uart_puts_fixed((char*)(temp_addr + sizeof(struct cpio_newc_header) + namesize + ((4 - ((sizeof(struct cpio_newc_header) + namesize)%4) ) % 4) ), filesize);
                 //uart_putc('\n');
             }
             return;
         }
 
-        temp_addr += (sizeof(struct cpio_newc_header) + namesize + filesize + ((4 - ((sizeof(struct cpio_newc_header) + namesize)%4) ) % 4) + ((4 - (filesize%4)) % 4));
+        temp_addr += (sizeof(struct cpio_newc_header) + namesize + filesize + align_offset((sizeof(struct cpio_newc_header) + namesize), 4) + align_offset(filesize, 4));
     }
     
     //uart_puts(input);

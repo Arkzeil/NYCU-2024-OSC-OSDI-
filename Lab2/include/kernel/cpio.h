@@ -37,7 +37,6 @@ struct cpio_newc_header {
     char    c_check[8];         // This field is always set	to zero	 by  writers  and  ignored  by readers.
 };
 
-void cpio_parse();
 void cpio_ls();
 void cpio_cat(char *input);
 

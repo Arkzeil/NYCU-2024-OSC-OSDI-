@@ -80,3 +80,8 @@ int h2i(const char *str, int len){
 
     return res;
 }
+
+int align_offset(unsigned int i, unsigned int align){
+    // (4-size%4) can get right value if size%4 != 0, so mod again to eliminate 0(if size%4 = 0, padding should be 0 instead of 4)
+    return ((align - (i % align) ) % align);
+}
