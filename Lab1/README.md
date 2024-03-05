@@ -30,6 +30,7 @@
     - Regarding COMDAT [ref](https://stackoverflow.com/questions/1834597/what-is-the-comdat-section-used-for)
 + .S file
     - Detail explaination are lied in my ```boot.S``` comments.
+    - The ```_start``` in assembly stands for the begining of assembly, yet when we load new code into ```_start``` it's actually loaded into address pointed by ```_start```. Which are not equlivent, so there should not be overlapping problem
     ---
     - Procedure:
         - Send all CPU except CPU0 to busy waiting, CPU0 will do the work.
@@ -37,6 +38,8 @@
         - clear BSS to all 0.
         - jump to ```main``` function in ```kernel_main.c```.
     - Regarding the register, remember w register(32bits) and x register(64bits) shared same address.
+    - Regarding ```.global``` in .S file, [ref](https://stackoverflow.com/questions/17898989/what-is-global-start-in-assembly-language):
+    > global directive is NASM specific. It is for exporting symbols in your code to where it points in the object code generated. Here you mark _start symbol global so its name is added in the object code (a.o). The linker (ld) can read that symbol in the object code and its value so it knows where to mark as an entry point in the output executable. When you run the executable it starts at where marked as _start in the code.
 > linker script calculates the BSS section size based on your program’s global uninitialized variables. During linking, the linker determines the actual memory addresses for _bssstart and _bssend, allowing the startup code to clear the BSS section effectively.
 ### Basic Exercise 2 - Mini UART
 [BCM2837 ARM Peripherals manual](https://github.com/raspberrypi/documentation/files/1888662/BCM2837-ARM-Peripherals.-.Revised.-.V2-1.pdf)
@@ -105,3 +108,6 @@
 ### Advanced Exercise 1 - Reboot
 + Just follow the TA's provided code, nothing special.
 + There's little data regarding this reset and watchdog register.
+
+## Debug
+```aarch64-linux-gnu-objdump -d kernel8.elf``` to check objdump assembly codes
