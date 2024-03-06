@@ -85,6 +85,20 @@ unsigned char uart_getc(){
     return r=='\r'?'\n':r;
 }
 
+unsigned char uart_getc_img(){
+    char r;
+    // p.15, bit 0 is set if the receive FIFO holds at least 1 symbol.
+    while(!((*AUX_MU_LSR_REG) & 0x01) ){
+        // if bit 0 is set, break and return IO_REG
+        asm volatile("nop");
+    }
+    //  p.11
+    //r =  (char)(mmio_read(AUX_MU_IO_REG));
+    r = (char)(*AUX_MU_IO_REG);
+    /* convert carriage return to newline */
+    return r;
+}
+
 void uart_puts(const char* str){
     // I thought this 'for' usage can't be in C
     //for(int i = 0; str[i] != '\0'; i++)

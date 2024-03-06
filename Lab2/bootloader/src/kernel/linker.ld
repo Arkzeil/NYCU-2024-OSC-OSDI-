@@ -6,7 +6,7 @@ SECTIONS
   /* C stack should start at address 0x80000 and grow downwards, since hardware loads our kernel to address 0x80000 and up, stack can safely run from 0x80000 and down*/
   /* 0x80000 is for aarch64, 0x8000 for 32 bits*/
   /* 0x80000 is our where our .text start, set the base address where our kernel8.img will be loaded*/
-  . = 0x60000; /*0x8000-0x60000=393216*/
+  . = 0x60000; /*0x80000-0x60000=393216*/
 
   /* save the current location as '__start'*/
   /* use 'PROVIDE' to prevent double declaration error(already defined in C)*/

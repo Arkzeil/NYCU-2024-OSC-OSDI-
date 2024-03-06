@@ -34,6 +34,7 @@
 void uart_init (void);
 void uart_putc(unsigned char c);
 unsigned char uart_getc();
+unsigned char uart_getc_img();
 void uart_puts(const char* str);
 // binary to hex, only for mailbox
 void uart_b2x(unsigned int b);
