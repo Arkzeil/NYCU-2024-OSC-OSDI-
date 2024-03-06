@@ -29,6 +29,8 @@
     - bootloader_main.c
         - ```char *kernel_addr = (char *)0x80000``` used to store where to put our loaded kernel.
         > a char pointer has the same alignment requirement as a void pointer.
+        - Use a '!' as marker to indicate the transmission is about to start
+            - Since on RPI, there's a high chance that a character somehow magically showed up before size is transmitted
         - ```kernel_size``` used to receive kernel size(in bytes) in little endian form.
         - Incrementally put received kernel data into 0x80000
         - Jump to 0x80000 to load new kernel
@@ -39,6 +41,12 @@
     1. ```qemu-system-aarch64 -M raspi3b -kernel bootloader.img -serial null -serial pty```
     2. run ```upload.py```
     3. ```screen /dev/pts/7 115200``` to check the output(may not be '7', qemu will tell you which number it is)
++ Testing(Rpi)
+    1. Wait until blue light on UART flash
+    2. ```screen /dev/ttyUSB0 115200```
+    3. ```ctrl+a``` then ```:quit```
+    4. run ```upload.py```
+    5. ```screen /dev/ttyUSB0 115200```
 ### Basic Exercise 2 - Initial Ramdisk 
 + Background
 > After a kernel is initialized, it mounts a root filesystem and runs an init user program. The init program can be a script or executable binary to bring up other services or load other drivers later on.
@@ -76,3 +84,10 @@
 + As it turned out I already finished it in basic exercise 1 part, which are the modifications of ```boot.S``` and ```linker.ld```
 ### Advanced Exercise 2 - Devicetree
 + Background
++ dtb format
+    - Header
+    - Memory Reservation Block
+    > Each pair gives the physical address and size in bytes of a reserved memory region. These given regions shall not overlap
+    > each other. The list of reserved blocks shall be terminated with an entry where both address and size are equal to 0. Note
+    > that the address and size values are always 64-bit. On 32-bit CPUs the upper 32-bits of the value are ignored
+    > Each uint64_t in the memory reservation block, and thus the memory reservation block as a whole, shall be located at an 8-byte aligned offset from the beginning of the devicetree blob
