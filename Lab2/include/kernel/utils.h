@@ -16,5 +16,9 @@ void string_set(char *str, int n, int size);
 int h2i(const char *str, int len); 
 // return a offset value to let i aligned to 'align' format
 int align_offset(unsigned int i, unsigned int align);
+// This one is for memory with 64bits
+int align_mem_offset(void* i, unsigned int align);
+// convert big endian to little endian 32bits
+unsigned int BE2LE(unsigned int BE);
 
 #endif

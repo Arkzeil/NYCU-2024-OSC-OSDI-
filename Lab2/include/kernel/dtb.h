@@ -5,6 +5,7 @@
 #include <stddef.h>
 #include "kernel/utils.h"
 #include "kernel/uart.h"
+#include "cpio.h"
 
 // The structure block is composed of a sequence of pieces, each beginning with a token, that is, a big-endian 32-bit integer.
 // Some tokens are followed by extra data
@@ -13,6 +14,8 @@
 #define FDT_PROP       0x00000003   // marks the beginning of the representation of one property in the devicetree. It shall be followed by extra data describing the property
 #define FDT_NOP        0x00000004   // ignored by any program parsing the device tree. This token has no extra data; so it is followed immediately by the next token
 #define FDT_END        0x00000009   //  marks the end of the structure block. There shall be only one FDT_END token, and it shall be the last token in the structure block. It has no extra data
+
+extern void* _dtb_addr;
 
 // It consists of a small header, followed by three variable sized sections: the memory reservation block, the structure block, and the strings block 
 struct fdt_header {
@@ -36,7 +39,7 @@ struct fdt_reserve_entry {
     uint64_t size;
 };
 
-void initramfs_callback();
-void fdt_traverse(void *callback, void *_dtb);
+void initramfs_callback(char *cpio_addr);
+void fdt_traverse(void (*callback)(char *), void *_dtb);
 
 #endif

@@ -85,3 +85,18 @@ int align_offset(unsigned int i, unsigned int align){
     // (4-size%4) can get right value if size%4 != 0, so mod again to eliminate 0(if size%4 = 0, padding should be 0 instead of 4)
     return ((align - (i % align) ) % align);
 }
+
+int align_mem_offset(void* i, unsigned int align){
+    return ((align - ((unsigned long long)i % align) ) % align);
+}
+
+unsigned int BE2LE(unsigned int BE){
+    unsigned int LE = 0;
+    int i = 24;
+
+    for(; i >= 0; i -= 8){
+        LE |= (((BE >> i) & 0xFF) << (24 - i));
+    }
+
+    return LE;
+}

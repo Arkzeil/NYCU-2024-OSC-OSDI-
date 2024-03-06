@@ -91,3 +91,9 @@
     > each other. The list of reserved blocks shall be terminated with an entry where both address and size are equal to 0. Note
     > that the address and size values are always 64-bit. On 32-bit CPUs the upper 32-bits of the value are ignored
     > Each uint64_t in the memory reservation block, and thus the memory reservation block as a whole, shall be located at an 8-byte aligned offset from the beginning of the devicetree blob
++ Get dtb address from .S
+    - Since dtb address will be loaded into ```x0``` reg, we need a global address in our assembly so that our c files can access that symbol containing address.
+    - declare a variable with 64bits long and make it global, remember to put that variable at ```.data``` section. Use ```.quad``` to make it 64bits.
++ utils.c
+    - The magic field in dtb header is big endian, so we have to find a way to make it little endian.
+    - Add a new function ```unsigned int BE2LE(unsigned int BE)``` to convert to little endian.
