@@ -1,4 +1,5 @@
 #include "kernel/utils.h"
+#include "kernel/dtb.h"
 
 char parse(const char c){
     if(c == CR)
@@ -87,7 +88,9 @@ int align_offset(unsigned int i, unsigned int align){
 }
 
 int align_mem_offset(void* i, unsigned int align){
-    return ((align - ((unsigned long long)i % align) ) % align);
+    // unsigned long long seemed not work properly?
+    uintptr_t l = (uintptr_t)i;
+    return ((align - (l % align) ) % align);
 }
 
 unsigned int BE2LE(unsigned int BE){

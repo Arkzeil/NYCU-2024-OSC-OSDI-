@@ -97,3 +97,4 @@
 + utils.c
     - The magic field in dtb header is big endian, so we have to find a way to make it little endian.
     - Add a new function ```unsigned int BE2LE(unsigned int BE)``` to convert to little endian.
+    - Add a new function ```int align_mem_offset(void* i, unsigned int align)``` for the alignment of memory address.
