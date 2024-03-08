@@ -39,7 +39,7 @@ struct fdt_reserve_entry {
     uint64_t size;
 };
 
-void initramfs_callback(char *cpio_addr);
-void fdt_traverse(void (*callback)(char *), void *_dtb);
+void initramfs_callback(char *struct_addr, char *string_addr, unsigned int prop_len);
+void fdt_traverse(void (*callback)(char *, char*, unsigned int));
 
 #endif
