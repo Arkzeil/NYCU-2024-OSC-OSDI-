@@ -26,13 +26,15 @@ void fdt_traverse(void (*callback)(char *), void *_dtb){
     callback(cpio_addr);
 
     while(struct_ptr < ((char*)fdt + BE2LE(fdt->off_dt_struct) + struct_size)){
-        switch(*struct_ptr){
+        uint32_t token = *(uint32_t*)struct_ptr;
+        struct_ptr += 4;
+        switch(BE2LE(token)){
             case FDT_NOP:
-                struct_ptr++;
+                //struct_ptr++;
                 break;
             case FDT_BEGIN_NODE:
                 uart_puts("node begin------------\n");
-                unsigned int print_len = uart_puts((char*)(++struct_ptr));
+                unsigned int print_len = uart_puts(struct_ptr);
                 uart_putc('\n');
                 struct_ptr += print_len;
                 // as there's a NULL, so add 1
@@ -45,18 +47,20 @@ void fdt_traverse(void (*callback)(char *), void *_dtb){
                 // property value length 0 just indicate the property itself is sufficient(meaning that property name still exist)
                 //if(*struct_ptr != 0x0){
                 // property length
-                unsigned int pro_len = BE2LE(*(unsigned int*)(++struct_ptr));
+                unsigned int pro_len = BE2LE(*(unsigned int*)(struct_ptr));
                 // 32bits
-                struct_ptr+=4;
-                // property name(string block)
+                struct_ptr += 4;
+                // property name offset (at string block)
                 uart_puts(struct_ptr + BE2LE(*(unsigned int*)struct_ptr));
                 uart_putc('\n');
                 // 32bits
-                struct_ptr+=4;
+                struct_ptr += 4;
                 // property value
-                uart_puts_fixed(struct_ptr, pro_len);
-                uart_putc('\n');
-                struct_ptr += pro_len;
+                if(pro_len > 0){
+                    uart_puts_fixed(struct_ptr, pro_len);
+                    uart_putc('\n');
+                    struct_ptr += pro_len;
+                }               
                 //}
                 /*uart_puts("len:");
                 uart_b2x(*struct_ptr++);
@@ -68,16 +72,16 @@ void fdt_traverse(void (*callback)(char *), void *_dtb){
                 break;
             case FDT_END_NODE:
                 uart_puts("node end--------------\n");
-                struct_ptr++;
+                //struct_ptr++;
                 break;
             case FDT_END:
                 uart_puts("node all end----------\n");
-                struct_ptr++;
+                //struct_ptr++;
                 break;
             default:
                 uart_b2x((unsigned int)*struct_ptr);
                 uart_putc('\n');
-                struct_ptr++;
+                //struct_ptr++;
         }
     }
     uart_b2x((unsigned int)*struct_ptr);
