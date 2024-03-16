@@ -5,15 +5,21 @@ void gdb_break(){
 
 void my_shell(){
     char buf[MAX_BUF_LEN];
+    char *argv[5];
     int buf_index;
     //char input_char;
+    for(buf_index = 0; buf_index < 5; buf_index++)
+        argv[buf_index] = simple_malloc(MAX_ARGV_LEN);
 
     while(1){
         buf_index = 0;
         string_set(buf, 0, MAX_BUF_LEN);
         uart_puts("# ");
 
-        buf_index = uart_get_fn(buf);
+        buf_index = uart_gets(buf, argv);
+        //buf_index = uart_get_fn(buf);
+        // this one requires to tuen on interrupt in main function(can move to somewhere else in the future)
+        //buf_index = uart_irq_gets(buf);
 
         if(buf_index >= MAX_BUF_LEN)
             uart_puts("Warning: buffer is full, command output may not correct\n");
@@ -57,7 +63,7 @@ void my_shell(){
             
             uart_puts("Filename: ");
             
-            buf_index = uart_get_fn(buf);
+            buf_index = uart_gets(buf, argv);
             if(buf_index >= MAX_BUF_LEN)
                 uart_puts("Warning: buffer is full, command output may not correct\n");
         
@@ -73,7 +79,7 @@ void my_shell(){
             
             uart_puts("Program name: ");
 
-            buf_index = uart_get_fn(buf);
+            buf_index = uart_gets(buf, argv);
             if(buf_index >= MAX_BUF_LEN)
                 uart_puts("Warning: buffer is full, command output may not correct\n");
 
@@ -97,6 +103,20 @@ void my_shell(){
                 : "x1", "x2"                                        // clobbered registers(those are modified)
             );
             gdb_break();
+        }
+        else if(!string_comp(buf, "async")){
+            char async_buf[MAX_BUF_LEN];
+
+            uart_irq_puts("Async I/O test:");
+            uart_irq_gets(async_buf);
+            uart_irq_puts("You just typed:");
+            uart_irq_puts(async_buf);
+        }
+        else if(!string_comp(buf, "settimeout")){
+            uart_puts(argv[0]);
+            uart_puts(argv[1]);
+
+            add_timer(print_callback, h2i(argv[1], string_len(argv[1])));
         }
         /*else if(!string_comp(buf, "test")){
             buf_index = 0;

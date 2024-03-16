@@ -2,6 +2,13 @@
 #include "kernel/gpio.h"
 #include "kernel/utils.h"
 
+char read_buffer[MAX_BUF_LEN];
+char write_buffer[MAX_BUF_LEN];
+int read_index_cur = 0;
+int read_index_tail = 0;
+int write_index_cur = 0;
+int write_index_tail = 0;
+
 void uart_init (void){
     // allocate an 32 bits register(if we don't assign resiter, it would be allocated in memory)
     register unsigned int reg;
@@ -164,13 +171,93 @@ void uart_b2x_64(unsigned long long b){
         uart_putc(t);
     }
 }
-
 int uart_get_fn(char *buf){
     int buf_index = 0;
     char input_char;
 
     while(1){
         input_char = uart_getc();
+        // Get non ASCII code
+        if(input_char > 127 || input_char < 0){
+            //uart_puts("\nwarning: Get non ASCII code\n");
+            continue;
+        }
+        uart_putc(input_char);
+
+        if(buf_index < MAX_BUF_LEN)
+            buf[buf_index++] = parse(input_char);
+        // should replace with parsed char
+        uart_putc(input_char);
+        // when receving ENTER
+        if(input_char == '\n'){
+            // add EOF after '\n'
+            buf[buf_index] = '\0';
+            break;
+        }
+    }
+
+    return buf_index;
+}
+
+int uart_gets(char *buf, char **argv){
+    int buf_index = 0;
+    int argv_buf_index[5] = {0};
+    int flag = -1;       // for argv
+    char input_char;
+
+    while(1){
+        input_char = uart_getc();
+        // Get non ASCII code
+        if(input_char > 127 || input_char < 0){
+            //uart_puts("\nwarning: Get non ASCII code\n");
+            continue;
+        }
+        //uart_putc(input_char);
+
+        if(input_char == ' '){
+            if(flag >= 0)
+                argv[flag][argv_buf_index[flag]] = '\0';
+            flag++;
+
+            string_set(argv[flag], 0, MAX_ARGV_LEN);
+        }
+        if(flag == -1){
+            if(buf_index < MAX_BUF_LEN)
+                buf[buf_index++] = parse(input_char);
+            // should replace with parsed char
+            uart_putc(input_char);
+            // when receving ENTER
+            if(input_char == '\n'){
+                // add EOF after '\n'
+                buf[buf_index] = '\0';
+                break;
+            }
+        }
+        else{
+            if(argv_buf_index[flag] < MAX_ARGV_LEN)
+                argv[flag][argv_buf_index[flag]++] = parse(input_char);
+            uart_putc(input_char);
+
+            if(input_char == '\n'){
+                // add EOF after '\n'
+                argv[flag][argv_buf_index[flag]] = '\0';
+                break;
+            }
+        }
+    }
+
+    return buf_index;
+}
+
+int uart_irq_gets(char *buf){
+    int buf_index = 0;
+    char input_char;
+
+    while(1){
+        input_char = (char)uart_irq_getc();
+        //uart_putc(input_char);
+        if(input_char == -1)
+            continue;
         // Get non ASCII code
         if(input_char > 127 || input_char < 0){
             //uart_puts("\nwarning: Get non ASCII code\n");
@@ -189,4 +276,48 @@ int uart_get_fn(char *buf){
     }
 
     return buf_index;
+}
+
+void uart_irq_on(){
+    *AUX_MU_IER_REG     |=   1;  //enable interrupt
+    *Enable_IRQs_1      |=   (1<<29);
+}
+
+void uart_irq_off(){
+    
+}
+
+int uart_irq_getc(){
+    // there's char in buffer
+    if(read_index_cur != read_index_tail){
+        int c = (int)read_buffer[read_index_cur++];
+        // make it circular
+        read_index_cur = read_index_cur % MAX_BUF_LEN;
+
+        return c;
+    }
+    else
+        return -1;
+}
+
+void uart_irq_putc(unsigned char c){
+    write_buffer[write_index_tail++] = c;
+    write_index_tail = write_index_tail % MAX_BUF_LEN;
+    //p.12 The AUX_MU_IER_REG register is primary used to enable interrupts 
+    mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | 0x2);
+}
+
+void uart_irq_puts(const char *str){
+    int i;
+
+    for(i = 0; str[i] != '\0'; i++){
+        if(str[i] == '\n'){
+            write_buffer[write_index_tail++] = '\r';
+            write_index_tail = write_index_tail % MAX_BUF_LEN;
+        }
+        write_buffer[write_index_tail++] = str[i];
+        write_index_tail = write_index_tail % MAX_BUF_LEN;
+    }
+
+    mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | 0x2);
 }

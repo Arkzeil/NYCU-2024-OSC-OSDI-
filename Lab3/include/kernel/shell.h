@@ -7,8 +7,7 @@
 #include "kernel/reboot.h"
 #include "kernel/cpio.h"
 #include "kernel/allocator.h"
-
-#define MAX_BUF_LEN 256
+#include "kernel/timer.h"
 
 void my_shell();
 

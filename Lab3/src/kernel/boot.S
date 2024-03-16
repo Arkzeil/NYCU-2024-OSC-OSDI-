@@ -59,7 +59,7 @@ set_exception_vector_table:
   cbnz w2, 2b
 
 3:
-  //bl core_timer_enable
+  bl core_timer_enable
   // jump to C code, will not return in normal scenario
   bl main
   // this line is for safety to send cpu0 to busy waiting if not work properly
@@ -68,7 +68,7 @@ set_exception_vector_table:
 from_el2_to_el1:
   mov x0, (1 << 31) // EL1 uses aarch64
   msr hcr_el2, x0   // hcr: hypervisior configuration register. bit[31] is set indicate that the Execution state for EL1 is AArch64
-  // 3C5->345 as unmask bit 7(IRQ masl)
+  // 3C5->345 as unmask bit 7(IRQ mask), s.t. el1 IRQ interrupt is enabled
   mov x0, 0x345     // EL1h (SPSel = 1) with interrupt disabled.   spsel, which consists of a single bit that controls whether sp is an alias of sp_el1 or sp_el0
   msr spsr_el2, x0  // spsr: saved program state register   cpsr: current program state register
   msr elr_el2, lr   // Saved the current return address into elr_el2(exception link register, only for aarch64, used for returning to PC after exception)
@@ -135,13 +135,21 @@ core_timer_enable:
   ret
 
 core_timer_handler:
+  //msr elr_el1, lr 
+  //mrs x0, cntfrq_el0
+  //mov x1, 2
+  //mul x0, x0, x1
+  //msr cntp_tval_el0, x0
   save_all
   bl c_core_timer_handler
   load_all
-  mrs x0, cntfrq_el0
-  mov x1, 2
-  mul x0, x0, x1
-  msr cntp_tval_el0, x0
+  eret
+
+general_irq_handler:
+  save_all
+  bl c_general_irq_handler
+  load_all
+  eret
 
 .align 11 // vector table should be aligned to 0x800
 .global exception_vector_table
@@ -157,7 +165,7 @@ exception_vector_table:
 
   b exception_handler
   .align 7
-  b core_timer_handler
+  b general_irq_handler
   .align 7
   b exception_handler
   .align 7
@@ -166,7 +174,7 @@ exception_vector_table:
 
   b exception_handler
   .align 7
-  b core_timer_handler
+  b general_irq_handler
   .align 7
   b exception_handler
   .align 7

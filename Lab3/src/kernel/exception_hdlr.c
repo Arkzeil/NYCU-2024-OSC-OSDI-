@@ -1,4 +1,7 @@
 #include "kernel/uart.h"
+#include "kernel/INT.h"
+#include "kernel/gpio.h"
+#include "kernel/timer.h"
 
 void c_exception_handler(){
     void *spsr1;
@@ -28,7 +31,7 @@ void c_exception_handler(){
     uart_b2x_64((unsigned long long)elr1);
     uart_putc('\n');
 
-    uart_puts("ESR_EL1:  ");
+    uart_puts("ESR_EL1:   ");
     uart_b2x_64((unsigned long long)esr1);
     uart_putc('\n');
 
@@ -40,13 +43,17 @@ void c_exception_handler(){
 }
 
 void c_core_timer_handler(){
-    unsigned long long cur_cnt, cnt_freq;
+    unsigned long long cur_cnt, cnt_freq, el;
 
     asm volatile(
         "mrs %[var1], cntpct_el0;"
         "mrs %[var2], cntfrq_el0;"
-        :[var1] "=r" (cur_cnt), [var2] "=r" (cnt_freq)
+        "mrs %[var3], CurrentEL;"
+        :[var1] "=r" (cur_cnt), [var2] "=r" (cnt_freq), [var3] "=r" (el)
     );
+    uart_puts("Current EL:");
+    uart_b2x_64((unsigned long long)el>>2);     // bits [3:2] contain current El value
+    uart_putc('\n');
 
     uart_puts("Time after boots: ");
     uart_b2x_64(cur_cnt / cnt_freq);
@@ -54,10 +61,129 @@ void c_core_timer_handler(){
 
     cnt_freq *= 2;
 
+    /*asm volatile(
+        "msr cntp_tval_el0, %[var1];"
+        "msr spsr_el1, %[var2];"
+        :
+        :[var1] "r" (cnt_freq), [var2] "r" (0)
+        :
+    );*/
     asm volatile(
         "msr cntp_tval_el0, %[var1];"
         :
         :[var1] "r" (cnt_freq)
         :
     );
+}
+
+void c_recv_handler(){
+    char c = (char)(*AUX_MU_IO_REG);
+    //uart_putc(c);
+    c = (c=='\r'?'\n':c);
+
+    read_buffer[read_index_tail++] = c;
+    read_index_tail = read_index_tail % MAX_BUF_LEN;
+}
+
+void c_write_handler(){
+    while(!((*AUX_MU_LSR_REG) & 0x20) ){
+        // if bit 5 is set, break and return IO_REG
+        asm volatile("nop");
+    }
+
+    while(write_index_cur != write_index_tail){
+        char c = write_buffer[write_index_cur++];
+
+        *AUX_MU_IO_REG = c;
+        // If no CR, first line of output will be moved right for n chars(n=shell command just input), not sure why
+        if(c == '\n'){
+            while(!((*AUX_MU_LSR_REG) & 0x20) ){
+                asm volatile("nop");
+            }
+            *AUX_MU_IO_REG = '\r';
+        }
+        
+        write_index_cur = write_index_cur % MAX_BUF_LEN;
+    }
+}
+
+void c_timer_callback(){
+    //print_callback();
+}
+
+void c_general_irq_handler(){
+    unsigned int cpu_irq_src, gpu_irq_src;
+    unsigned long long el, daif;
+    // First save interrupt current status, then turn off interrupt by mask DAIF bits
+    asm volatile(
+        "mrs %[var1], daif;"
+        "msr daifset, 0xf;"
+        :[var1] "=r" (daif)
+    );
+
+    asm volatile(
+        "mrs %[var1], CurrentEL;"
+        :[var1] "=r" (el)
+    );
+    
+    /*uart_puts("Current EL:");
+    uart_b2x_64((unsigned long long)el>>2);     // bits [3:2] contain current El value
+    uart_putc('\n');*/
+
+    cpu_irq_src = mmio_read((long)CORE0_INT_SRC);
+
+    /*uart_puts("core0 src:");
+    uart_b2x(cpu_irq_src);
+    uart_putc('\n');*/
+    
+    // Through this, we can see that uart interrupt is in pending register 1(0x00000100)
+    /*irq_src = mmio_read((long)IRQ_basic_pending);
+    uart_puts("basic pending:");
+    uart_b2x(irq_src);
+    uart_putc('\n');*/
+
+    gpu_irq_src = mmio_read((long)IRQ_pending_1);
+    /*uart_puts("pending 1:");
+    uart_b2x(gpu_irq_src);
+    uart_putc('\n');*/
+    // There periphial interrupt in pending 1 register
+    // if bit29, meaning a async write or read
+    if(gpu_irq_src & (1 << 29)){
+        //uart_puts("Periphial IRQ\n");
+
+        unsigned int irq_status = mmio_read((long)AUX_MU_IIR_REG);
+        //uart_b2x(irq_status);
+        // [2:1]=10 : Receiver holds valid byte 
+        if(irq_status & 0x4){
+            // disable receive interrupt by setting bit1 to 0
+            mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG & ~(0x1));
+            c_recv_handler();
+            mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | (0x1));
+        }
+        // [2:1]=01 : Transmit holding register empty
+        if(irq_status & 0x2){
+            // disable transmit interrupt, set bit2 to 0
+            mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG & ~(0x2));
+            c_write_handler();
+        }
+    }
+    // CNTPNSIRQ interrupt bit, this is by observation, not quite sure why is that bit(which is Non-secure physical timer event.)
+    // https://developer.arm.com/documentation/100964/1118/Fast-Models-components/SystemIP-components/GIC-400
+    if(cpu_irq_src & (0x1 << 1)){
+        uart_puts("Timer IRQ\n");
+        c_core_timer_handler();
+        // disable core0 timer interrupt, 
+        // p.13 https://github.com/Tekki/raspberrypi-documentation/blob/master/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf
+        mmio_write((long)CORE0_TIMER_IRQ_CTRL, 0);
+    }
+
+    asm volatile(
+        "msr daif, %[var1];"
+        :
+        :[var1] "r" (daif)
+    );
+
+    /*while(1){
+
+    }*/
 }

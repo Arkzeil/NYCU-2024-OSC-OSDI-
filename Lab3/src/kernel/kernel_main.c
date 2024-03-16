@@ -41,5 +41,7 @@ void main(void)
     uart_b2x_64((unsigned long long)el>>2);     // bits [3:2] contain current El value
     uart_putc('\n');
 
+    //uart_irq_on();
+
     my_shell();
 }
