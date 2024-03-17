@@ -62,6 +62,15 @@ void string_set(char *str, int n, int size){
         str[i] = n;
 }
 
+void string_copy(char *dst, char *src){
+    int i;
+    dst = simple_malloc(string_len(src));
+
+    for(i = 0; i < string_len(src); i++){
+        dst = src[i];
+    }
+}
+
 int h2i(const char *str, int len){
     int i;
     int res = 0;

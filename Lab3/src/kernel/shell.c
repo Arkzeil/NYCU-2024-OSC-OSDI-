@@ -116,7 +116,7 @@ void my_shell(){
             uart_puts(argv[0]);
             uart_puts(argv[1]);
 
-            add_timer(print_callback, h2i(argv[1], string_len(argv[1])));
+            settimeout(argv[0], h2i(argv[1], string_len(argv[1])));
         }
         /*else if(!string_comp(buf, "test")){
             buf_index = 0;

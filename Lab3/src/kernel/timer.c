@@ -3,7 +3,7 @@
 task_timer_t* head = 0;
 task_timer_t* tail = 0;
 
-int add_timer(void (*callback)(void *), int after){
+int add_timer(void (*callback)(void *), void* data, int after){
     // This is for "If the timeout is earlier than the previous programed expired time, the kernel reprograms the hardware timer to the earlier one."
     int timer_set_flag = 0;
     unsigned long long cur_cnt, cnt_freq;
@@ -29,8 +29,12 @@ int add_timer(void (*callback)(void *), int after){
     // malloc fail
     if(temp == 0)
         return 0;
+    // preserve data
+    char *copy;
+    string_copy(copy, data);
 
     temp->callback = callback;
+    temp->data = copy;
     temp->deadline = after;
     temp->next = 0;
     temp->prev = 0;
@@ -99,7 +103,7 @@ int add_timer(void (*callback)(void *), int after){
     return 1;
 }
 
-void print_callback(char *str){
+void print_callback(void *str){
     unsigned long long cur_cnt, cnt_freq;
     uart_puts("The message is: ");
     uart_puts(str);
@@ -113,4 +117,10 @@ void print_callback(char *str){
     uart_puts("Timeout: ");
     uart_b2x_64(cur_cnt / cnt_freq);
     uart_putc('\n');
+}
+
+void settimeout(char *str, int second){
+    //char *copy;
+    //string_copy(copy, str);
+    add_timer(print_callback, (void*)str, second);
 }
