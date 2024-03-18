@@ -1,7 +1,7 @@
 #include "kernel/timer.h"
 
-task_timer_t* head = 0;
-task_timer_t* tail = 0;
+task_timer_t* timer_head = 0;
+task_timer_t* timer_tail = 0;
 
 int add_timer(void (*callback)(void *), void* data, int after){
     // This is for "If the timeout is earlier than the previous programed expired time, the kernel reprograms the hardware timer to the earlier one."
@@ -9,12 +9,12 @@ int add_timer(void (*callback)(void *), void* data, int after){
     unsigned long long cur_cnt, cnt_freq;
 
     // empty queue
-    /*if(head == tail){
-        head = simple_malloc(sizeof(task_timer_t));
-        if(head == 0)
+    /*if(timer_head == timer_tail){
+        timer_head = simple_malloc(sizeof(task_timer_t));
+        if(timer_head == 0)
             return 0;
 
-        tail = head;
+        timer_tail = timer_head;
     }*/
     // Invalid setting
     if(after == 0)
@@ -24,49 +24,69 @@ int add_timer(void (*callback)(void *), void* data, int after){
         "msr daifset, 0xf;"
     );
 
-    task_timer_t *cur = head;
+    asm volatile(
+        "mrs %[var1], cntpct_el0;"
+        "mrs %[var2], cntfrq_el0;"
+        :[var1] "=r" (cur_cnt), [var2] "=r" (cnt_freq)
+    );
+
+    // preserve data
+    char *copy = simple_malloc(string_len((char*)data) + 1);
+    if(copy == 0)
+        return 0;
+    string_copy(copy, (char*)data);
+
+    task_timer_t *cur = timer_head;
     task_timer_t *temp = simple_malloc(sizeof(task_timer_t));
     // malloc fail
     if(temp == 0)
         return 0;
-    // preserve data
-    char *copy;
-    string_copy(copy, data);
 
     temp->callback = callback;
-    temp->data = copy;
-    temp->deadline = after;
+    temp->data = (void*)copy;
+    // set to current_time + waiting seconds, as this is be compared with current_time in the irq_handler
+    temp->deadline = cur_cnt + after * cnt_freq;
     temp->next = 0;
     temp->prev = 0;
+
+
+    uart_b2x_64(cur_cnt);
+    uart_putc('\n');
+    uart_b2x_64(after * cnt_freq);
+    uart_putc('\n');
+    uart_b2x_64(temp->deadline);
+    uart_putc('\n');
 
     while(1){
         // this is the first timer inserted into queue
         if(cur == 0){
-            head = temp;
-            tail = temp;
+            timer_head = temp;
+            timer_tail = temp;
             timer_set_flag = 1;
+            // enable core0 timer interrupt
+            mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
             break;
         }
         // insert into appropiate location based on increase-order
-        if(after <= cur->deadline){
+        if(temp->deadline <= cur->deadline){
             temp->prev = cur->prev;
             if(cur->prev != 0)
                 cur->prev->next = temp;
             cur->prev = temp;
             temp->next = cur;
-            // if it is inserted into the head of queue
-            if(cur == head){
-                head = temp;
+            // if it is inserted into the timer_head of queue
+            if(cur == timer_head){
+                timer_head = temp;
                 timer_set_flag = 1;
             }
             break;
         }
         // traverse to last element
-        if(cur == tail){
-            tail->next = temp;
-            temp->prev = tail;
+        if(cur == timer_tail){
+            timer_tail->next = temp;
+            temp->prev = timer_tail;
 
-            tail = temp;
+            timer_tail = temp;
             
             break;
         }    
@@ -75,25 +95,29 @@ int add_timer(void (*callback)(void *), void* data, int after){
     }
 
     if(timer_set_flag){
-        asm volatile(
-            "mrs %[var1], cntpct_el0;"
-            "mrs %[var2], cntfrq_el0;"
-            :[var1] "=r" (cur_cnt), [var2] "=r" (cnt_freq)
-        );
-        // Get current_time + waiting seconds
-        cnt_freq *= after;
+        //cnt_freq *= after;
         //cnt_freq += cur_cnt;
-        // setting tval leads to cval = cur_time + tval
+        // setting tval leads to cval = cur_time + tval, 
+        // we set cval here in order to conform irq_handler as ot will set cval based on struct's element(which is cur_time(when added) + after)
         
         asm volatile(
-            "msr cntp_tval_el0, %[var1];"
+            "msr cntp_cval_el0, %[var1];"
             :
-            :[var1] "r" (cnt_freq)
+            :[var1] "r" (temp->deadline)
             :
         );
+
+        asm volatile(
+            "msr cntp_ctl_el0, %[var1];"
+            :
+            :[var1] "r" (1)
+        );
     }
+    /*while(1){
+
+    }*/
     // activate core0 timer interrupt
-    mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
+    //mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
 
     // enable all interrupt
     asm volatile(
@@ -106,7 +130,7 @@ int add_timer(void (*callback)(void *), void* data, int after){
 void print_callback(void *str){
     unsigned long long cur_cnt, cnt_freq;
     uart_puts("The message is: ");
-    uart_puts(str);
+    uart_puts((char*)str);
 
     asm volatile(
         "mrs %[var1], cntpct_el0;"
@@ -114,13 +138,14 @@ void print_callback(void *str){
         :[var1] "=r" (cur_cnt), [var2] "=r" (cnt_freq)
     );
 
-    uart_puts("Timeout: ");
+    uart_puts("   Timeout: ");
     uart_b2x_64(cur_cnt / cnt_freq);
     uart_putc('\n');
 }
 
 void settimeout(char *str, int second){
-    //char *copy;
-    //string_copy(copy, str);
+    /*char *copy = simple_malloc(string_len(str) + 1);
+    string_copy(copy, str);
+    uart_puts(copy);*/
     add_timer(print_callback, (void*)str, second);
 }

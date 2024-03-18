@@ -64,11 +64,11 @@ void string_set(char *str, int n, int size){
 
 void string_copy(char *dst, char *src){
     int i;
-    dst = simple_malloc(string_len(src));
 
     for(i = 0; i < string_len(src); i++){
-        dst = src[i];
+        dst[i] = src[i];
     }
+    dst[i] = '\0';
 }
 
 int h2i(const char *str, int len){

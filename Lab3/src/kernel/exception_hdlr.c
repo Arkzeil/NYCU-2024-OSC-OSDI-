@@ -108,7 +108,66 @@ void c_write_handler(){
 }
 
 void c_timer_callback(){
-    //print_callback();
+    unsigned long long cur_cnt, value;
+    task_timer_t *cur = timer_head;
+
+    if(cur == 0)
+        return;
+
+    value = 0;
+    // disable interrupt to protect critical section
+    asm volatile(
+        "msr cntp_ctl_el0, %[var1];"
+        :
+        :[var1] "r" (value)
+    );
+
+    asm volatile(
+        "msr daifset, 0xf;"
+    );
+
+    asm volatile(
+        "mrs %[var1], cntpct_el0;"
+        :[var1] "=r" (cur_cnt)
+    );
+    uart_b2x_64(cur_cnt);
+    uart_putc('\n');
+
+    while(cur_cnt >= cur->deadline){
+        cur->callback(cur->data);
+        
+        timer_head = cur->next;
+        if(timer_head != 0){
+            timer_head->prev = 0;
+            // If the timeout is earlier than the previous programed expired time, the kernel reprograms the hardware timer to the earlier one.
+            // enable timer
+            value = 1;
+            asm volatile(
+                "msr cntp_cval_el0, %[var1];"
+                "msr cntp_ctl_el0, %[var2];"
+                :
+                :[var1] "r" (timer_head->deadline), [var2] "r" (value)
+            );
+        }
+        else{
+            // disable timer
+            value = 0;
+            asm volatile(
+                "msr cntp_ctl_el0, %[var1];"
+                :
+                :[var1] "r" (value)
+            );
+
+            break;
+        }
+        // free cur(not implemented)
+        cur = cur->next;
+    }
+
+    // enable all interrupt of current EL
+    asm volatile(
+        "msr daifclr, 0xf;"
+    );
 }
 
 void c_general_irq_handler(){
@@ -171,10 +230,12 @@ void c_general_irq_handler(){
     // https://developer.arm.com/documentation/100964/1118/Fast-Models-components/SystemIP-components/GIC-400
     if(cpu_irq_src & (0x1 << 1)){
         uart_puts("Timer IRQ\n");
-        c_core_timer_handler();
+
         // disable core0 timer interrupt, 
         // p.13 https://github.com/Tekki/raspberrypi-documentation/blob/master/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf
         mmio_write((long)CORE0_TIMER_IRQ_CTRL, 0);
+        //c_core_timer_handler();
+        c_timer_callback();
     }
 
     asm volatile(

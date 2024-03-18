@@ -118,6 +118,11 @@ void my_shell(){
 
             settimeout(argv[0], h2i(argv[1], string_len(argv[1])));
         }
+        else if(!string_comp(buf, "test")){
+            //settimeout("task1", 6);
+            settimeout("task2", 3);
+            //settimeout("task3", 9);
+        }
         /*else if(!string_comp(buf, "test")){
             buf_index = 0;
             string_set(buf, 0, MAX_BUF_LEN);

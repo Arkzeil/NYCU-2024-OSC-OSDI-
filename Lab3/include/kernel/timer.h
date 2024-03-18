@@ -11,11 +11,11 @@ typedef struct task_timer{
     struct task_timer *next;
     void (*callback)(void *);
     void *data;
-    unsigned int deadline;
+    unsigned long long deadline;
 }task_timer_t;
 
-extern task_timer_t* head;
-extern task_timer_t* tail;
+extern task_timer_t* timer_head;
+extern task_timer_t* timer_tail;
 
 int add_timer(void (*callback)(void *), void* data, int after);
 void print_callback(void *str);
