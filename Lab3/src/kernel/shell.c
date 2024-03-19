@@ -121,7 +121,7 @@ void my_shell(){
         else if(!string_comp(buf, "test")){
             //settimeout("task1", 6);
             settimeout("task2", 3);
-            //settimeout("task3", 9);
+            settimeout("task3", 9);
         }
         /*else if(!string_comp(buf, "test")){
             buf_index = 0;

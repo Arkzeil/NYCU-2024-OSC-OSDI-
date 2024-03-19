@@ -130,8 +130,8 @@ void c_timer_callback(){
         "mrs %[var1], cntpct_el0;"
         :[var1] "=r" (cur_cnt)
     );
-    uart_b2x_64(cur_cnt);
-    uart_putc('\n');
+    //uart_b2x_64(cur_cnt);
+    //uart_putc('\n');
 
     while(cur_cnt >= cur->deadline){
         cur->callback(cur->data);
@@ -146,10 +146,13 @@ void c_timer_callback(){
                 "msr cntp_cval_el0, %[var1];"
                 "msr cntp_ctl_el0, %[var2];"
                 :
-                :[var1] "r" (timer_head->deadline), [var2] "r" (value)
+                :[var1] "r" (timer_head->deadline), [var2] "r" (1)
             );
+            // Since we turn off the core0 timer interrupt in general interrupt handler, we need to turn it on again
+            mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
         }
         else{
+            uart_puts("No more timer\n");
             // disable timer
             value = 0;
             asm volatile(

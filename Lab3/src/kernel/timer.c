@@ -50,12 +50,12 @@ int add_timer(void (*callback)(void *), void* data, int after){
     temp->prev = 0;
 
 
-    uart_b2x_64(cur_cnt);
+    /*uart_b2x_64(cur_cnt);
     uart_putc('\n');
     uart_b2x_64(after * cnt_freq);
     uart_putc('\n');
     uart_b2x_64(temp->deadline);
-    uart_putc('\n');
+    uart_putc('\n');*/
 
     while(1){
         // this is the first timer inserted into queue
@@ -87,7 +87,8 @@ int add_timer(void (*callback)(void *), void* data, int after){
             temp->prev = timer_tail;
 
             timer_tail = temp;
-            
+            uart_puts((char*)timer_tail->data);
+            uart_putc('\n');
             break;
         }    
 
