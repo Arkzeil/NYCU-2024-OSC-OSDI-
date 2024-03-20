@@ -10,9 +10,11 @@ void* simple_malloc(unsigned int size){
     if(offset + size > MAX_HEAP_SIZE)
         return 0;
 
+    // allocate space
     allocated += size;
-
+    // record accumulated allocated space
     offset += size;
+
     // we need to return the head instead of tail of allocated space
     return (allocated - size);
 }

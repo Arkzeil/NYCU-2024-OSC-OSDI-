@@ -1,4 +1,5 @@
 #include "kernel/shell.h"
+#include <stddef.h>
 void gdb_break(){
     uart_puts("this is just for gdb\n");
 }
@@ -107,10 +108,14 @@ void my_shell(){
         else if(!string_comp(buf, "async")){
             char async_buf[MAX_BUF_LEN];
 
+            uart_irq_on();
+
             uart_irq_puts("Async I/O test:");
             uart_irq_gets(async_buf);
             uart_irq_puts("You just typed:");
             uart_irq_puts(async_buf);
+
+            uart_irq_off();
         }
         else if(!string_comp(buf, "settimeout")){
             uart_puts(argv[0]);
@@ -133,6 +138,13 @@ void my_shell(){
             settimeout("task1", 6);
             settimeout("task2", 3);
             settimeout("task3", 9);
+        }
+        else if(!string_comp(buf, "test2")){
+            task_create_DF1(print_callback, "task1", 1);
+            task_create_DF1(print_callback, "task2", 2);
+            task_create_DF0(task_callback, 0);
+
+            ExecTasks();
         }
         /*else if(!string_comp(buf, "test")){
             buf_index = 0;

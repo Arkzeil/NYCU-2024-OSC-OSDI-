@@ -32,16 +32,23 @@ int add_timer(void (*callback)(void *), void* data, int after){
 
     // preserve data
     char *copy = simple_malloc(string_len((char*)data) + 1);
-    if(copy == 0)
+    if(copy == 0){
+        asm volatile(
+            "msr daifclr, 0xf;"
+        );
         return 0;
+    }
     string_copy(copy, (char*)data);
 
     task_timer_t *cur = timer_head;
     task_timer_t *temp = simple_malloc(sizeof(task_timer_t));
     // malloc fail
-    if(temp == 0)
+    if(temp == 0){
+        asm volatile(
+            "msr daifclr, 0xf;"
+        );
         return 0;
-
+    }
     temp->callback = callback;
     temp->data = (void*)copy;
     // set to current_time + waiting seconds, as this is be compared with current_time in the irq_handler
@@ -56,17 +63,16 @@ int add_timer(void (*callback)(void *), void* data, int after){
     uart_putc('\n');
     uart_b2x_64(temp->deadline);
     uart_putc('\n');*/
+    // this is the first timer inserted into queue
+    if(timer_head == 0){
+        timer_head = temp;
+        timer_tail = temp;
+        timer_set_flag = 1;
+        // enable core0 timer interrupt
+        mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
+    }
 
-    while(1){
-        // this is the first timer inserted into queue
-        if(cur == 0){
-            timer_head = temp;
-            timer_tail = temp;
-            timer_set_flag = 1;
-            // enable core0 timer interrupt
-            mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
-            break;
-        }
+    while(!timer_set_flag){
         // insert into appropiate location based on increase-order
         if(temp->deadline <= cur->deadline){
             temp->prev = cur->prev;
@@ -148,5 +154,6 @@ void settimeout(char *str, int second){
     /*char *copy = simple_malloc(string_len(str) + 1);
     string_copy(copy, str);
     uart_puts(copy);*/
-    add_timer(print_callback, (void*)str, second);
+    if(add_timer(print_callback, (void*)str, second) == 0)\
+        uart_puts("Fail to set timeout\n");
 }

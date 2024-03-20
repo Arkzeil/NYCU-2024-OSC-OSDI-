@@ -2,6 +2,7 @@
 #include "kernel/INT.h"
 #include "kernel/gpio.h"
 #include "kernel/timer.h"
+#include "kernel/task.h"
 
 void c_exception_handler(){
     void *spsr1;
@@ -107,7 +108,7 @@ void c_write_handler(){
     }
 }
 
-void c_timer_callback(){
+void c_timer_handler(){
     unsigned long long cur_cnt, value;
     task_timer_t *cur = timer_head;
 
@@ -219,7 +220,8 @@ void c_general_irq_handler(){
         if(irq_status & 0x4){
             // disable receive interrupt by setting bit1 to 0
             mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG & ~(0x1));
-            c_recv_handler();
+            task_create_DF0(c_recv_handler, 1);
+            //c_recv_handler();
             mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | (0x1));
         }
         // [2:1]=01 : Transmit holding register empty
@@ -238,14 +240,20 @@ void c_general_irq_handler(){
         // p.13 https://github.com/Tekki/raspberrypi-documentation/blob/master/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf
         mmio_write((long)CORE0_TIMER_IRQ_CTRL, 0);
         //c_core_timer_handler();
-        c_timer_callback();
+        c_timer_handler();
     }
-
-    asm volatile(
+    // Restore interrupt status
+    /*asm volatile(
         "msr daif, %[var1];"
         :
         :[var1] "r" (daif)
+    );*/
+    // enable all interrupt
+    asm volatile(
+        "msr daifclr, 0xf;"
     );
+
+    ExecTasks();
 
     /*while(1){
 

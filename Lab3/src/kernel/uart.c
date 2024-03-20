@@ -279,12 +279,13 @@ int uart_irq_gets(char *buf){
 }
 
 void uart_irq_on(){
-    *AUX_MU_IER_REG     |=   1;  //enable interrupt
+    *AUX_MU_IER_REG     |=   1;  //enable receive interrupt(transmit will be handled in its function)
     *Enable_IRQs_1      |=   (1<<29);
 }
 
 void uart_irq_off(){
-    
+    mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG & ~(0x1));  //disable receive interrupt
+    *Disable_IRQs_1     |=   (1<<29);
 }
 
 int uart_irq_getc(){

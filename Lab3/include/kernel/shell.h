@@ -8,6 +8,7 @@
 #include "kernel/cpio.h"
 #include "kernel/allocator.h"
 #include "kernel/timer.h"
+#include "kernel/task.h"
 
 void my_shell();
 
