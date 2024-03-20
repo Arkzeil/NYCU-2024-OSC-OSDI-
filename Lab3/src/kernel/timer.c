@@ -87,8 +87,8 @@ int add_timer(void (*callback)(void *), void* data, int after){
             temp->prev = timer_tail;
 
             timer_tail = temp;
-            uart_puts((char*)timer_tail->data);
-            uart_putc('\n');
+            /*uart_puts((char*)timer_tail->data);
+            uart_putc('\n');*/
             break;
         }    
 

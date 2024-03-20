@@ -119,7 +119,18 @@ void my_shell(){
             settimeout(argv[0], h2i(argv[1], string_len(argv[1])));
         }
         else if(!string_comp(buf, "test")){
-            //settimeout("task1", 6);
+            unsigned long long cur_cnt, cnt_freq;
+
+            asm volatile(
+                "mrs %[var1], cntpct_el0;"
+                "mrs %[var2], cntfrq_el0;"
+                :[var1] "=r" (cur_cnt), [var2] "=r" (cnt_freq)
+            );
+
+            uart_puts("Current Time:");
+            uart_b2x_64(cur_cnt / cnt_freq);
+
+            settimeout("task1", 6);
             settimeout("task2", 3);
             settimeout("task3", 9);
         }
