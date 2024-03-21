@@ -144,7 +144,7 @@ void task_callback(void){
 // Function to print the tasks in the task queue
 void ExecTasks(void) {
     task_t* cur = task_head;
-    
+
     while(cur != 0){
         //uart_puts((char*)cur->data);
         cur->callback(cur->data);

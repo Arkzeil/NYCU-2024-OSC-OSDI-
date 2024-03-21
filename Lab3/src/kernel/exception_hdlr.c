@@ -78,6 +78,8 @@ void c_core_timer_handler(){
 }
 
 void c_write_handler(){
+    //mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | 0x2);
+    
     while(!((*AUX_MU_LSR_REG) & 0x20) ){
         // if bit 5 is set, break and return IO_REG
         asm volatile("nop");
@@ -97,7 +99,7 @@ void c_write_handler(){
         
         write_index_cur = write_index_cur % MAX_BUF_LEN;
     }
-
+    // enable receiver interrupt
     mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | (0x1));
 }
 
@@ -114,6 +116,7 @@ void c_recv_handler(){
     write_index_tail = write_index_tail % MAX_BUF_LEN;
 
     task_create_DF0(c_write_handler, 2);
+    //mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | 0x2);
 }
 
 void c_timer_handler(){
@@ -184,13 +187,13 @@ void c_timer_handler(){
 
 void c_general_irq_handler(){
     unsigned int cpu_irq_src, gpu_irq_src;
-    unsigned long long el, daif;
+    unsigned long long spsr1, elr1, el;
     // First save interrupt current status, then turn off interrupt by mask DAIF bits
-    asm volatile(
+    /*asm volatile(
         "mrs %[var1], daif;"
         "msr daifset, 0xf;"
         :[var1] "=r" (daif)
-    );
+    );*/
 
     asm volatile(
         "mrs %[var1], CurrentEL;"
@@ -258,12 +261,25 @@ void c_general_irq_handler(){
         :
         :[var1] "r" (daif)
     );*/
+    // Save the current state
+    asm volatile(
+        "mrs %[var1], spsr_el1;"
+        "mrs %[var2], elr_el1;"
+        : [var1] "=r" (spsr1), [var2] "=r" (elr1)
+    );
     // enable all interrupt
     asm volatile(
         "msr daifclr, 0xf;"
     );
-
     ExecTasks();
+    // Restore the previous state
+    asm volatile(
+        "msr spsr_el1, %[var1];"
+        "msr elr_el1, %[var2];"
+        "eret"
+        :
+        : [var1] "r" (spsr1), [var2] "r" (elr1)
+    );
 
     /*while(1){
 
