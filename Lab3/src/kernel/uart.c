@@ -266,7 +266,7 @@ int uart_irq_gets(char *buf){
         if(buf_index < MAX_BUF_LEN)
             buf[buf_index++] = parse(input_char);
         // should replace with parsed char
-        uart_putc(input_char);
+        //uart_putc(input_char);
         // when receving ENTER
         if(input_char == '\n'){
             // add EOF after '\n'

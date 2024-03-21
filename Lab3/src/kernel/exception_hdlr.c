@@ -77,15 +77,6 @@ void c_core_timer_handler(){
     );
 }
 
-void c_recv_handler(){
-    char c = (char)(*AUX_MU_IO_REG);
-    //uart_putc(c);
-    c = (c=='\r'?'\n':c);
-
-    read_buffer[read_index_tail++] = c;
-    read_index_tail = read_index_tail % MAX_BUF_LEN;
-}
-
 void c_write_handler(){
     while(!((*AUX_MU_LSR_REG) & 0x20) ){
         // if bit 5 is set, break and return IO_REG
@@ -106,6 +97,23 @@ void c_write_handler(){
         
         write_index_cur = write_index_cur % MAX_BUF_LEN;
     }
+
+    mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | (0x1));
+}
+
+void c_recv_handler(){
+    char c = (char)(*AUX_MU_IO_REG);
+    //uart_putc(c);
+    c = (c=='\r'?'\n':c);
+
+    read_buffer[read_index_tail++] = c;
+    read_index_tail = read_index_tail % MAX_BUF_LEN;
+
+    // Put into write buffer such that the received char can be echoed out
+    write_buffer[write_index_tail++] = c;
+    write_index_tail = write_index_tail % MAX_BUF_LEN;
+
+    task_create_DF0(c_write_handler, 2);
 }
 
 void c_timer_handler(){
@@ -222,13 +230,15 @@ void c_general_irq_handler(){
             mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG & ~(0x1));
             task_create_DF0(c_recv_handler, 1);
             //c_recv_handler();
-            mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | (0x1));
+            // not enable interrupt as we must first let recv_handler to execute
+            //mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | (0x1));
         }
         // [2:1]=01 : Transmit holding register empty
         if(irq_status & 0x2){
             // disable transmit interrupt, set bit2 to 0
             mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG & ~(0x2));
-            c_write_handler();
+            //c_write_handler();
+            task_create_DF0(c_write_handler, 1);
         }
     }
     // CNTPNSIRQ interrupt bit, this is by observation, not quite sure why is that bit(which is Non-secure physical timer event.)

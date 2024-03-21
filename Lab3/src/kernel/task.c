@@ -92,8 +92,6 @@ int task_create_DF0(void (*callback)(), int priority){
     newTask->data = (void*)0;
     newTask->priority = priority;
 
-    uart_puts("task_create_DF0\n");
-
     // this is the first task inserted into queue
     if(task_head == 0){
         task_head = newTask;
