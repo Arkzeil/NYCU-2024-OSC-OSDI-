@@ -80,23 +80,43 @@
     > This register is provided so that software can discover the frequency of the system counter. 
 **This three seemed to be less relevent to the Exception Level its name indicates, not sure if there's other explaination**
 - Regarding ```CORE0_TIMER_IRQ_CTRL```(it's not a register name, but a address pointing to core timer status registers):
-    > 
+    - We set 2 to enable ```CNTPNSIRQ``` IRQ control.
+    - Why ```CNTPNSIRQ```?(Based on Claude)
+    > By default, the Generic Timer is only accessible from higher Exception Levels (EL1 and above)
+    > Enables Non-secure EL0 access to the ARM Generic Timer counter to allow user-space applications to use the timer directly, without requiring kernel intervention. This can improve performance for timing-critical applications but may also have security implications that need to be considered.
 
 + ```c_core_timer_handler``` will print the seconds after booting and set the next timeout to 2 seconds later.(But it's not used in final code as the advanced part require more complicated handler. If you wanna use it, go to ```c_general_irq_handler``` and modify ```if(cpu_irq_src & (0x1 << 1))``` block, comment out ```mmio_write``` and ```c_timer_handler``` than uncomment ```c_core_timer_handler();```)
     - Setting ```cntp_tval_el0``` to desired value(```cntfrq_el0 * time```) to triger interrupt later.
+
 ### Basic Exercise 3 - Rpi3’s Peripheral Interrupt
 + Background
++ Enable mini UART’s Interrupt:
+    - Define function ```void uart_irq_on()``` and ```void uart_irq_off()``` to control the receive interrupt(as the transmit interrupt will be invoked inside ```void uart_irq_puts()```) and set ```Enable IRQs1```
+    > The Enable IRQs1 register (at address 0x3f00b210) is part of the external interrupt controller (IC) on the Broadcom SoC, and it is responsible for enabling or disabling specific interrupt sources from the peripherals.
+    > bit 29 of the Enable IRQs1 register is mapped to the mini UART's interrupt source. Therefore, to enable the mini UART's interrupt to be propagated to the ARM processor's GIC
++ Determine the Interrupt Source
+    - Define a function ```void c_general_irq_handler()```
+        - check ```IRQ_pending_1``` register for the interrupt source(which is for 2nd level interrupt controller(gpu)), bit 29 stands for mini UART's interrupt(uart write or read here)
+        - check ```CORE0_INT_SRC``` register[ref](https://github.com/Tekki/raspberrypi-documentation/blob/master/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf), bit 2 stands for ```CNTPNSIRQ``` interrupt(core timer)
++ Asynchronous Read and Write:
+    - Define buffer and index(tail and cur) for read and write, to store the asynchronous character into in and take out.
+    - ```void uart_irq_putc``` will manually trigger interrupt by setting register, while the receive interrupt will be triggered as soon as we type characters.
 + Disable interrupt
     - There's no single CPSR in aarch64 like in aarch32, so we user ```daif``` to manipulate DAIF bits
 ---
 ## Advanced Exercises
 ### Advanced Exercise 1 - Timer Multiplexing
 + Background
++ Timer Multiplexing
++ Define ```struct task_timer``` for setting timer task, as it will be used to create a queue(using double linked list). The task with smaller timeout will be put at the front of queue. 
++ The timeout value is saved as absolute time as it will be used to compare with other timeout value in the queue. So the timer interrupt also needs to use ```cntp_cval_el0``` to set.
++ Reset timer if there's a closer timeout in queue
+
 + If there's exception handler function that will leads to the infinite c_exception_handler() invoking, then it's probably due to synchronous interrupt(Something wrong in the exception handler).
-+ Why does the data copy in ```add_timer``` will not work when assigning it to task_timer->data? while function parameter can work?
-    - If the malloc of struct is earlier than string malloc, then the string is corrupted?  -> Something wrong with my simple_malloc?
+
 
 ### Advanced Exercise 2 - Concurrent I/O Devices Handling
++ Build ```struct task``` which is very similar to ```task_timer_t```
 + The receive task needs to put into task queue in interrupt handler, but the interrupt handler will not execute the task immediately until ExecTask() is called, so another interrupt may will happen as the intrrupt is still on and the data is not take out from register.
 + Be caution about the priority as write_handler called in recv_handler must has lower priority than recv_handler itself.
 + Nested interrupt: remember that the task queue may not cast out currently executing task from the queue, and if an interupt occurred inside that task, which will lead to an infinite execution of first task. -> change the head of task queue before executing callback function.
