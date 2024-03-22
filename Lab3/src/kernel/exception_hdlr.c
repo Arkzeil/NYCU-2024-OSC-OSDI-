@@ -115,8 +115,8 @@ void c_recv_handler(){
     write_buffer[write_index_tail++] = c;
     write_index_tail = write_index_tail % MAX_BUF_LEN;
 
-    task_create_DF0(c_write_handler, 2);
-    //mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | 0x2);
+    //task_create_DF0(c_write_handler, 2);
+    mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | 0x2);
 }
 
 void c_timer_handler(){
@@ -241,7 +241,7 @@ void c_general_irq_handler(){
             // disable transmit interrupt, set bit2 to 0
             mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG & ~(0x2));
             //c_write_handler();
-            task_create_DF0(c_write_handler, 1);
+            task_create_DF0(c_write_handler, 0);
         }
     }
     // CNTPNSIRQ interrupt bit, this is by observation, not quite sure why is that bit(which is Non-secure physical timer event.)
@@ -276,11 +276,9 @@ void c_general_irq_handler(){
     asm volatile(
         "msr spsr_el1, %[var1];"
         "msr elr_el1, %[var2];"
-        "eret"
         :
         : [var1] "r" (spsr1), [var2] "r" (elr1)
     );
-
     /*while(1){
 
     }*/

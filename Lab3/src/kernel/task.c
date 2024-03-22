@@ -146,13 +146,12 @@ void ExecTasks(void) {
     task_t* cur = task_head;
 
     while(cur != 0){
-        //uart_puts((char*)cur->data);
-        cur->callback(cur->data);
-
         task_head = cur->next;
         if(task_head != 0){
             task_head->prev = 0;
         }
+        //uart_puts((char*)cur->data);
+        cur->callback(cur->data);
         // free cur(not implemented)
         cur = cur->next;
     }
