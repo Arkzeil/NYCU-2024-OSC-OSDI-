@@ -79,16 +79,10 @@ void c_core_timer_handler(){
 
 void c_write_handler(){
     //mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | 0x2);
-    
-    while(!((*AUX_MU_LSR_REG) & 0x20) ){
-        // if bit 5 is set, break and return IO_REG
-        asm volatile("nop");
-    }
 
     while(write_index_cur != write_index_tail){
         char c = write_buffer[write_index_cur++];
 
-        *AUX_MU_IO_REG = c;
         // If no CR, first line of output will be moved right for n chars(n=shell command just input), not sure why
         if(c == '\n'){
             while(!((*AUX_MU_LSR_REG) & 0x20) ){
@@ -96,6 +90,13 @@ void c_write_handler(){
             }
             *AUX_MU_IO_REG = '\r';
         }
+
+        // check if FIFO can accept at least one byte after sending one character
+        while(!((*AUX_MU_LSR_REG) & 0x20) ){
+            // if bit 5 is set, break and return IO_REG
+            asm volatile("nop");
+        }
+        *AUX_MU_IO_REG = c;
         
         write_index_cur = write_index_cur % MAX_BUF_LEN;
     }
@@ -104,6 +105,11 @@ void c_write_handler(){
 }
 
 void c_recv_handler(){
+    while(!((*AUX_MU_LSR_REG) & 0x01) ){
+        // if bit 0 is set, break and return IO_REG
+        asm volatile("nop");
+    }
+
     char c = (char)(*AUX_MU_IO_REG);
     //uart_putc(c);
     c = (c=='\r'?'\n':c);

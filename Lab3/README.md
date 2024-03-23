@@ -101,6 +101,7 @@
 + Asynchronous Read and Write:
     - Define buffer and index(tail and cur) for read and write, to store the asynchronous character into in and take out.
     - ```void uart_irq_putc``` will manually trigger interrupt by setting register, while the receive interrupt will be triggered as soon as we type characters.
+    - **On RPI3, you should add delays after asynchronous I/O(my ```async``` command of shell in my case) as its output may mixed with next command if not to. The reason is probably related to the interrupt signal not captured before interrupt is turned off.**
 + Disable interrupt
     - There's no single CPSR in aarch64 like in aarch32, so we user ```daif``` to manipulate DAIF bits
 ---

@@ -107,6 +107,7 @@ void my_shell(){
         }
         else if(!string_comp(buf, "async")){
             char async_buf[MAX_BUF_LEN];
+            int ticks = 150;
 
             uart_irq_on();
 
@@ -114,6 +115,8 @@ void my_shell(){
             uart_irq_gets(async_buf);
             uart_irq_puts("You just typed:");
             uart_irq_puts(async_buf);
+            // if this line is not added, the output will be mixed with the next command
+            while(ticks--);
 
             uart_irq_off();
         }
