@@ -29,6 +29,7 @@
             > Vector Base Address Register: Holds the vector base address for any exception that is taken to EL1.
         - Regarding ```svc```
             > SuperVisor Call (SVC) instruction, with that the user can trigger an exception. Like a bridge between kernel mode and user mode.(ioctl)
+        - **The assembly TA provided will cause exception 5 times**
 + Save context:
     - Just use the codes TA provided to save registers into stack.
 + uart.c
