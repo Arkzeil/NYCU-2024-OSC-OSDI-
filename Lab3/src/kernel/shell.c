@@ -4,6 +4,8 @@ void gdb_break(){
     uart_puts("this is just for gdb\n");
 }
 
+int boot_timer_flag = 1;
+
 void my_shell(){
     char buf[MAX_BUF_LEN];
     char *argv[5];
@@ -33,6 +35,11 @@ void my_shell(){
             uart_puts("ls       :list all files in initramfs\n");
             uart_puts("cat      :show the content of file\n");
             uart_puts("el0      :execute programs in initramfs in El0\n");
+            uart_puts("async    :try the async I/O\n");
+            uart_puts("off      :turn off the 2 seconds timer\n");
+            uart_puts("settimeout: set the timeout for the task\n");
+            uart_puts("timer    :run the timer interrupt test\n");
+            uart_puts("task     :run the task test\n");
         }
         else if(!string_comp(buf, "hello")){
             uart_puts("Hello World!\n");
@@ -120,13 +127,20 @@ void my_shell(){
 
             uart_irq_off();
         }
+        else if(!string_comp(buf, "off")){
+            if(boot_timer_flag != 0){
+                boot_timer_flag = 0;
+            }
+        }
         else if(!string_comp(buf, "settimeout")){
             uart_puts(argv[0]);
+            uart_putc(' ');
             uart_puts(argv[1]);
+            //uart_b2x(h2i(argv[1], string_len(argv[1])));
 
             settimeout(argv[0], h2i(argv[1], string_len(argv[1])));
         }
-        else if(!string_comp(buf, "test")){
+        else if(!string_comp(buf, "timer")){
             unsigned long long cur_cnt, cnt_freq;
 
             asm volatile(
@@ -142,7 +156,7 @@ void my_shell(){
             settimeout("task2", 3);
             settimeout("task3", 9);
         }
-        else if(!string_comp(buf, "test2")){
+        else if(!string_comp(buf, "task")){
             task_create_DF1(print_callback, "task1", 1);
             task_create_DF1(print_callback, "task2", 2);
             task_create_DF0(task_callback, 0);

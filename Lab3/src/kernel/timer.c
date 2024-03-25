@@ -154,6 +154,6 @@ void settimeout(char *str, int second){
     /*char *copy = simple_malloc(string_len(str) + 1);
     string_copy(copy, str);
     uart_puts(copy);*/
-    if(add_timer(print_callback, (void*)str, second) == 0)\
+    if(add_timer(print_callback, (void*)str, second) == 0)
         uart_puts("Fail to set timeout\n");
 }

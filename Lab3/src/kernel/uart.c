@@ -234,7 +234,7 @@ int uart_gets(char *buf, char **argv){
             }
         }
         else{
-            if(argv_buf_index[flag] < MAX_ARGV_LEN)
+            if(argv_buf_index[flag] < MAX_ARGV_LEN && input_char != ' ')
                 argv[flag][argv_buf_index[flag]++] = parse(input_char);
             uart_putc(input_char);
 

@@ -32,8 +32,6 @@
         - **The assembly TA provided will cause exception 5 times**
 + Save context:
     - Just use the codes TA provided to save registers into stack.
-+ uart.c
-    - Add 
 + cpio.c
     - Add a function ```void *cpio_find(char *input)``` that can give me address of specific file inside initramfs. 
 + exception_hdlr.c
@@ -70,6 +68,8 @@
 > 3. After handling the interrupt, the saved state is restored, and execution resumes from the point where it was interrupted.
 + Parts I don't quite understand
 > In the basic part, you only need to enable interrupt in EL0. You can do it by setting spsr_el1 to 0 before returning to EL0.
++ ```c_core_timer_handler()``` will handle timer interrupt, which is just print out time after boots and set next timer to 2 seconds.
++ add shell command ```off``` to turn off the 2 seconds timer
 
 - Regarding ```cntp_ctl_el0```:
     > Control register for the EL1 physical timer.

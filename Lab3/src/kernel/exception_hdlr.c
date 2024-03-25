@@ -255,11 +255,15 @@ void c_general_irq_handler(){
     if(cpu_irq_src & (0x1 << 1)){
         uart_puts("Timer IRQ\n");
 
-        // disable core0 timer interrupt, 
-        // p.13 https://github.com/Tekki/raspberrypi-documentation/blob/master/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf
-        mmio_write((long)CORE0_TIMER_IRQ_CTRL, 0);
-        //c_core_timer_handler();
-        c_timer_handler();
+        if(boot_timer_flag != 0){
+            c_core_timer_handler();
+        }
+        else{
+            // disable core0 timer interrupt, 
+            // p.13 https://github.com/Tekki/raspberrypi-documentation/blob/master/hardware/raspberrypi/bcm2836/QA7_rev3.4.pdf
+            mmio_write((long)CORE0_TIMER_IRQ_CTRL, 0);
+            c_timer_handler();
+        }
     }
     // Restore interrupt status
     /*asm volatile(

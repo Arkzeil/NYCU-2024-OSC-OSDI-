@@ -16,4 +16,6 @@
 #define CORE0_INT_SRC           (volatile unsigned int*)(0x40000060)
 #define CORE0_TIMER_IRQ_CTRL    (volatile unsigned int*)(0x40000040)
 
+extern int boot_timer_flag;
+
 #endif
