@@ -35,6 +35,7 @@ typedef struct buddy_block_list{
     int val;                    // the order of the block, -2 indicate that it belongs to a larger contiguous memory block, -1 indicates that is already allocated
     struct buddy_block_list *prev;   // the previous block
     struct buddy_block_list *next;   // the next block
+    int size;                   // the size of the block 
     void *addr;                 // the address of the memory block
 } buddy_block_list_t;
 
@@ -42,7 +43,7 @@ typedef struct buddy_block_list{
 typedef struct buddy_system{
     //buddy_block_list_t *buddy_list;  // store the list of free blocks of different sizes
     buddy_block_list_t **buddy_list;
-    void* first_avail[MAX_ORDER];      // the address of the first available block metadata
+    int first_avail[MAX_ORDER];         // the index of the first available block metadata
     void* list_addr[MAX_ORDER];        // record where list starts(actually is uunecssary(as it can be calculated by adding blocks' size), just for convenience)
 }buddy_system_t;
 

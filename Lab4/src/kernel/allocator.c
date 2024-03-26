@@ -22,7 +22,7 @@ void* simple_malloc(unsigned int size){
 
 void buddy_init(void){
     int i;
-    buddy_system_t *buddy = (buddy_system_t*)BUDDY_START;
+    buddy = (buddy_system_t*)BUDDY_START;
     buddy->buddy_list = (buddy_block_list_t**)(BUDDY_START + sizeof(buddy_system_t));
 
     //buddy_block_list_t buddy_list[MAX_ORDER];
@@ -36,7 +36,7 @@ void buddy_init(void){
         int alloc_offset = 0;
         int block_amount = (1 << (MAX_ORDER - i - 1));
         
-        buddy->first_avail[i] = (void*)list;
+        buddy->first_avail[i] = -1;
         buddy->list_addr[i] = (void*)list;
 
         buddy_block_list_t *cur = list;
@@ -56,6 +56,7 @@ void buddy_init(void){
             cur->next = 0;
             // the address of the memory of corresponding block
             cur->addr = buddy_mem_start + alloc_offset;
+            cur->size = PAGE_SIZE * (1 << i);
             /*uart_b2x_64((unsigned long long)cur->addr);
             uart_putc(' ');
             uart_b2x_64((unsigned long long)cur->val);
@@ -67,8 +68,23 @@ void buddy_init(void){
         }
         //uart_putc('\n');
         // goto next block list
-        list = (buddy_block_list_t *)(buddy->buddy_list + block_amount * sizeof(buddy_block_list_t));
+        list += block_amount * sizeof(buddy_block_list_t);
     }
+
+    /*for(i = 0; i < MAX_ORDER; i++){
+        int j = 0;
+        int block_amount = (1 << (MAX_ORDER - i - 1));
+        for(j = 0; j < block_amount; j++){
+            buddy_block_list_t *cur = buddy->list_addr[i];
+
+            uart_b2x_64((unsigned long long)cur->size);
+            uart_putc(' ');
+            cur += sizeof(buddy_block_list_t);
+        }
+        uart_putc('\n');
+    }*/
+    // In the begining, only the largest block is available
+    buddy->first_avail[MAX_ORDER - 1] = 0;
 }
 // get buddy of one level lower order
 int find_buddy(int index, int order){
@@ -77,34 +93,33 @@ int find_buddy(int index, int order){
     return index ^ order;
 }
 
-void* buddy_split(buddy_block_list_t *block_addr,int req_size, int order){
-    if((PAGE_SIZE * (1 << order) / 2) < req_size || order == 0)
-        return block_addr->addr;
-    else{
-        int i;
-        int block_amount = (1 << (MAX_ORDER - order - 1));
-        buddy_block_list_t *list_head = (buddy_block_list_t *)buddy->list_addr[order];
-        buddy_block_list_t *cur = block_addr->next;
+buddy_block_list_t* buddy_split(int start_index, int end_index, int req_size, int order){
+    int i;
 
-        block_addr->val = -1;
-        do{
-            if(cur->val >= 0)
-                cur->val = -1;
-            cur = cur->next;
-        }while(cur->next != 0);
+    for(i = order; i >= 0; i--){
+        int j = start_index;
+        buddy_block_list_t *start = buddy->list_addr[i] + (start_index / (1 << i)) * sizeof(buddy_block_list_t);
+        buddy_block_list_t *cur = (buddy_block_list_t *)start;
 
-        // find the first available block of the same size
-        buddy_block_list_t *avail = cur;
-        while(avail->next != 0){
-            if(avail->next->val >= 0){
-                buddy->first_avail[order - 1] = avail->next;
-                break;
-            }
-            avail = avail->next;
+        if((PAGE_SIZE * (1 << i) / 2) < req_size || i == 0){
+            start->val = -1;
+            return start;
         }
-        // split the block recursively
-        return buddy_split(cur,req_size, order - 1);
+
+        for(; j < end_index && cur->next != 0; j += (1 << i)){
+            if(cur->val == -2){
+                cur->val = i;
+
+                if(buddy->first_avail[i] < 0 || buddy->first_avail[i] > j)
+                    buddy->first_avail[i] = j;
+            }
+            cur = cur->next;
+        }
+        // mark current block as allocated
+        cur->val = -1;
     }
+
+    return 0;
 }
 // always allocate first block of smallest fitted size
 void* buddy_malloc(unsigned int size){
@@ -113,51 +128,63 @@ void* buddy_malloc(unsigned int size){
     if(buddy == 0)
         buddy_init();
 
-    if(size > (1 << (MAX_ORDER - 1))){
+    if(size > PAGE_SIZE * (1 << (MAX_ORDER - 1))){
         uart_puts("Requested size is too large\n");
         return 0;
     }
 
-    buddy_block_list_t *list_head = (buddy_block_list_t *)buddy->buddy_list;
 
     for(i = 0; i < MAX_ORDER; i++){
-        int block_amount = (1 << (MAX_ORDER - i - 1));
-
         if(PAGE_SIZE * (1 << i) >= size){
-            if(buddy->first_avail[i] != 0){
-                buddy_block_list_t *cur = (buddy_block_list_t *)buddy->first_avail[i];
+            if(buddy->first_avail[i] >= 0){
+                buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[i] + (buddy->first_avail[i] / (1 << i)) * sizeof(buddy_block_list_t);
+                //buddy_block_list_t *cur = (buddy_block_list_t *)buddy->first_avail[i];
                 // meaning that the mechanism went wrong, this condition should not be met
                 if(cur->val < 0){
+                    uart_puts("Error: The first available block is already allocated\n");
                     return 0;
                 }
                 // marked as allocated
                 cur->val = -1;
 
-                buddy->first_avail[i] = 0;
+                int avail_index = buddy->first_avail[i];
+                buddy->first_avail[i] = -1;
+
+                //split the block as small as possible
+                buddy_block_list_t *buddy_allocated = buddy_split(avail_index, avail_index + (1 << i), size, i);
+
                 // find next available block
                 buddy_block_list_t *avail = cur;
                 while(avail->next != 0){
                     if(avail->next->val >= 0){
-                        buddy->first_avail[i] = avail->next;
+                        buddy->first_avail[i] = avail_index;
                         break;
                     }
                     avail = avail->next;
+                    avail_index++;
+                }
+
+                for(i = 0; i < MAX_ORDER; i++){
+                    int j = 0;
+                    int block_amount = (1 << (MAX_ORDER - i - 1));
+                    for(j = 0; j < block_amount; j++){
+                        buddy_block_list_t *cur = buddy->list_addr[i];
+
+                        uart_b2x_64((unsigned long long)cur->val);
+                        uart_putc(' ');
+                        cur += sizeof(buddy_block_list_t);
+                    }
+                    uart_putc('\n');
                 }
 
                 uart_puts("Allocated block size:");
-                uart_b2x_64((unsigned long long)(PAGE_SIZE * (1 << i) ) );
+                uart_b2x_64((unsigned long long)buddy_allocated->size);
                 uart_puts(" at: ");
-                uart_b2x_64((unsigned long long)cur->addr);
+                uart_b2x_64((unsigned long long)buddy_allocated->addr);
                 uart_putc('\n');
-
-                //split the block as small as possible
-                buddy_split(cur, size, i);
-
-                break;
+                return (void*)(buddy_allocated->addr);
             }
             else{
-                // goto next list with larger block size
-                list_head = (buddy_block_list_t *)(buddy->buddy_list + block_amount * sizeof(buddy_block_list_t));
                 continue;
             }
         }

@@ -168,6 +168,7 @@ void my_shell(){
         }
         else if(!string_comp(buf, "buddy")){
             buddy_init();
+            buddy_malloc(65536);
         }
         else{
             uart_puts("Unknown Command: ");
