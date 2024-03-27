@@ -101,7 +101,7 @@ buddy_block_list_t* buddy_split(int start_index, int end_index, int req_size, in
         buddy_block_list_t *start = (buddy_block_list_t *)buddy->list_addr[i] + (start_index / (1 << i)) * sizeof(buddy_block_list_t);
         buddy_block_list_t *cur = (buddy_block_list_t *)start;
 
-        for(; j < end_index && cur->next != 0; j += (1 << i)){
+        /*for(; j < end_index && cur->next != 0; j += (1 << i)){
             if(j < end_index / 2){
                 if(cur->val == -2){
                     cur->val = i;
@@ -111,13 +111,23 @@ buddy_block_list_t* buddy_split(int start_index, int end_index, int req_size, in
                 }
             }
             cur = cur->next;
+        }*/
+        if(cur->next != 0){
+            if(cur->next->val == -2){
+                cur->next->val = i;
+
+                if(buddy->first_avail[i] < 0 || buddy->first_avail[i] > j)
+                    buddy->first_avail[i] = cur->next->idx;
+            }
         }
+
+        //end_index /= 2;
 
         if((PAGE_SIZE * (1 << i) / 2) < req_size || i == 0){
             start->val = -1;
             return start;
         }
-
+        
         // mark current block as allocated(as its lower level block will be allocated in later iterations)
         start->val = -1;
     }
