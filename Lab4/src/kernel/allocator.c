@@ -93,44 +93,60 @@ int find_buddy(int index, int order){
     return index ^ order;
 }
 
+int get_next_avail(int order){
+    int i;
+    buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[order];
+    for(i = 0; i < (1 << (MAX_ORDER - 1)); i += (1 << order)){
+        if(cur->val >= 0)
+            return i;
+        cur = cur->next;
+    }
+    return -1;
+}
+
 buddy_block_list_t* buddy_split(int start_index, int end_index, int req_size, int order){
     int i;
 
-    for(i = order; i >= 0; i--){
+    if((PAGE_SIZE * (1 << order) / 2) < req_size || order == 0){
+        buddy->first_avail[order] = get_next_avail(order);
+        return (buddy_block_list_t *)buddy->list_addr[0] + start_index * sizeof(buddy_block_list_t);
+    }
+    for(i = order - 1; i >= 0; i--){
         int j = start_index;
         buddy_block_list_t *start = (buddy_block_list_t *)buddy->list_addr[i] + (start_index / (1 << i)) * sizeof(buddy_block_list_t);
         buddy_block_list_t *cur = (buddy_block_list_t *)start;
 
-        /*for(; j < end_index && cur->next != 0; j += (1 << i)){
-            if(j < end_index / 2){
-                if(cur->val == -2){
-                    cur->val = i;
+        for(; j < end_index && cur != 0; j += (1 << i)){
+            if(cur->val == -2){
+                cur->val = i;
 
-                    if(buddy->first_avail[i] < 0 || buddy->first_avail[i] > j)
-                        buddy->first_avail[i] = j;
-                }
+                /*if(buddy->first_avail[i] < 0 || buddy->first_avail[i] > j)
+                    buddy->first_avail[i] = j;*/
+                buddy->first_avail[i] = get_next_avail(i);
             }
             cur = cur->next;
-        }*/
-        if(cur->next != 0){
+        }
+        end_index /= 2;
+        /*if(cur->next != 0){
             if(cur->next->val == -2){
                 cur->next->val = i;
 
                 if(buddy->first_avail[i] < 0 || buddy->first_avail[i] > j)
                     buddy->first_avail[i] = cur->next->idx;
             }
-        }
-
-        //end_index /= 2;
+        }*/
 
         if((PAGE_SIZE * (1 << i) / 2) < req_size || i == 0){
             start->val = -1;
+            buddy->first_avail[i] = get_next_avail(i);
             return start;
         }
         
         // mark current block as allocated(as its lower level block will be allocated in later iterations)
         start->val = -1;
     }
+    /*if(order == 0)
+        return (buddy_block_list_t *)buddy->list_addr[0] + start_index * sizeof(buddy_block_list_t);*/
 
     return 0;
 }
@@ -161,13 +177,13 @@ void* buddy_malloc(unsigned int size){
                 cur->val = -1;
 
                 int avail_index = buddy->first_avail[i];
-                buddy->first_avail[i] = -1;
+                //buddy->first_avail[i] = -1;
 
                 //split the block as small as possible
                 buddy_block_list_t *buddy_allocated = buddy_split(avail_index, avail_index + (1 << i), size, i);
 
                 // find next available block
-                buddy_block_list_t *avail = cur;
+                /*buddy_block_list_t *avail = cur;
                 while(avail->next != 0){
                     if(avail->next->val >= 0){
                         buddy->first_avail[i] = avail_index;
@@ -175,7 +191,8 @@ void* buddy_malloc(unsigned int size){
                     }
                     avail = avail->next;
                     avail_index += (1 << i);
-                }
+                }*/
+                //buddy->first_avail[i] = get_next_avail(i);
 
                 for(i = 0; i < MAX_ORDER; i++){
                     int j = 0;
@@ -189,6 +206,12 @@ void* buddy_malloc(unsigned int size){
                     }
                     uart_putc('\n');
                 }
+                for(i = 0; i < MAX_ORDER; i++){
+                    buddy->first_avail[i] = get_next_avail(i);
+                    uart_b2x_64((unsigned long long)buddy->first_avail[i]);
+                    uart_putc(' ');
+                }
+                uart_putc('\n');
 
                 uart_puts("Allocated block size:");
                 uart_b2x_64((unsigned long long)buddy_allocated->size);
