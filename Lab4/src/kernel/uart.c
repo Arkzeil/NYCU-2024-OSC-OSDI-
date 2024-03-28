@@ -171,6 +171,33 @@ void uart_b2x_64(unsigned long long b){
         uart_putc(t);
     }
 }
+
+void uart_itoa(int num){
+    char str[12];
+    int i = 0;
+    int j = 0;
+    int is_negative = 0;
+
+    if(num < 0){
+        is_negative = 1;
+        num = -num;
+    }
+
+    do{
+        str[i++] = num % 10 + '0';
+        num /= 10;
+    }while(num);
+
+    if(is_negative)
+        str[i++] = '-';
+
+    str[i] = '\0';
+
+    for(j = i - 1; j >= 0; j--){
+        uart_putc(str[j]);
+    }
+}
+
 int uart_get_fn(char *buf){
     int buf_index = 0;
     char input_char;

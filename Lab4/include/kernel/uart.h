@@ -52,6 +52,7 @@ void uart_puts_fixed(const char *str, int len);
 void uart_b2x(unsigned int b);
 // for 64 bits universal version
 void uart_b2x_64(unsigned long long b);
+void uart_itoa(int num);
 // this is for returning a printable string obtained from user, usually for file name
 int uart_gets(char *buf, char **argv);
 int uart_get_fn(char *buf);

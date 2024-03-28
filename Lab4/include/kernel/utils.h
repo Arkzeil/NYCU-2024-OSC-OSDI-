@@ -22,6 +22,8 @@ int h2i(const char *str, int len);
 int align_offset(unsigned int i, unsigned int align);
 // This one is for memory with 64bits
 int align_mem_offset(void* i, unsigned int align);
+// only for simple log, assuming the num is always the exponential of base
+int simple_log(int num, int base);
 // convert big endian to little endian 32bits
 unsigned int BE2LE(unsigned int BE);
 

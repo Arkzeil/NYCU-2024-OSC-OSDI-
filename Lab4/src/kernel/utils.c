@@ -102,6 +102,16 @@ int align_mem_offset(void* i, unsigned int align){
     return ((align - (l % align) ) % align);
 }
 
+int simple_log(int num, int base){
+    int i = 0;
+    while(num != 1){
+        num /= base;
+        i++;
+    }
+
+    return i;
+}
+
 unsigned int BE2LE(unsigned int BE){
     unsigned int LE = 0;
     int i = 24;

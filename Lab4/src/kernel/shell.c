@@ -173,6 +173,7 @@ void my_shell(){
             buddy_malloc(4096);
             buddy_malloc(8192);
             buddy_malloc(8193);
+            buddy_free((void*)0x10008A28);
         }
         else{
             uart_puts("Unknown Command: ");

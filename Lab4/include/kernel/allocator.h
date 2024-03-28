@@ -32,7 +32,7 @@ typedef struct buddy_block_list{
 
 typedef struct buddy_block_list{
     unsigned int idx;           // the index of the block(used minimum size block as unit, so the index is the index of the block in the whole memory block)
-    int val;                    // the order of the block, -2 indicate that it belongs to a larger contiguous memory block, -1 indicates that is already allocated
+    int val;                    // the order of the block,-3 indicates that it's divided into smaller blocks, -2 indicate that it belongs to a larger contiguous memory block, -1 indicates that is already allocated
     struct buddy_block_list *prev;   // the previous block
     struct buddy_block_list *next;   // the next block
     int size;                   // the size of the block 
