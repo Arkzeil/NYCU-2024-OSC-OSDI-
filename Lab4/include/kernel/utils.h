@@ -24,6 +24,8 @@ int align_offset(unsigned int i, unsigned int align);
 int align_mem_offset(void* i, unsigned int align);
 // only for simple log, assuming the num is always the exponential of base
 int simple_log(int num, int base);
+// find the minimum value between a and b
+int find_min(int a, int b);
 // convert big endian to little endian 32bits
 unsigned int BE2LE(unsigned int BE);
 

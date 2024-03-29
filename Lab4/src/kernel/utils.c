@@ -112,6 +112,10 @@ int simple_log(int num, int base){
     return i;
 }
 
+int find_min(int a, int b){
+    return a < b ? a : b;
+}
+
 unsigned int BE2LE(unsigned int BE){
     unsigned int LE = 0;
     int i = 24;

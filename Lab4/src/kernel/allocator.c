@@ -72,9 +72,7 @@ void buddy_init(void){
 }
 // get buddy of one level lower order
 int find_buddy(int index, int order){
-    if(order == 0)
-        return index + 1;
-    return index ^ order;
+    return index ^ (1 << order);
 }
 // get the index of the next available block
 int get_next_avail(int order){
@@ -94,14 +92,16 @@ int get_index(void *addr){
 // get block metadata address by using index
 buddy_block_list_t* get_block(int index){
     buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[0] + index * sizeof(buddy_block_list_t);
+    buddy_block_list_t *last = cur;
     for(int i = 0; i < MAX_ORDER; i++){
-        if(index % (1 << i) != 0)
-            return 0;
-        // get smallest allocated block(as the )
-        if(cur->val == -1)
-            return cur;
-        
         cur = (buddy_block_list_t *)buddy->list_addr[i] + (index / (1 << i)) * sizeof(buddy_block_list_t);
+        // this block index is not legal in this level, indicate that it must belonged to lower levels
+        if(index % (1 << i) != 0)
+            return last;
+        // if larger block is not -1, meaning that we reach the target block as larger block will also make smaller ones become -1
+        if(cur->val != -1)
+            return last;
+        last = cur;
     }
 
     return cur;
@@ -165,6 +165,19 @@ void mark_allocated(buddy_block_list_t* start){
         for(; j < end_index && cur != 0; j += (1 << i)){
             if(cur->val == -2)
                 cur->val = -1;
+            cur = cur->next;
+        }
+    }
+}
+
+void free_child(int block_index, int order){
+    int i;
+
+    for(i = order - 1; i >= 0; i--){
+        int j;
+        buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[i] + (block_index / (1 << i)) * sizeof(buddy_block_list_t);
+        for(j = 0; j < (1 << order); j += (1 << i)){
+            cur->val = -2;
             cur = cur->next;
         }
     }
@@ -241,8 +254,74 @@ void* buddy_malloc(unsigned int size){
 
 void buddy_free(void *addr){
     int block_index = get_index(addr);
+    buddy_block_list_t *cur_block = get_block(block_index);
+    int order = simple_log(cur_block->size / PAGE_SIZE, 2);
+    int buddy_index = find_buddy(block_index, order);
+    buddy_block_list_t *buddy_block = (buddy_block_list_t *)buddy->list_addr[order] + (buddy_index / (1 << order)) * sizeof(buddy_block_list_t);
+    /*uart_itoa(cur_block->size);
+    uart_putc(' ');
     uart_itoa(block_index);
     uart_putc(' ');
-    uart_b2x_64((unsigned long long)get_block(block_index)->addr);
+    uart_b2x_64((unsigned long long)cur_block->addr);
+    uart_putc(' ');
+    uart_itoa(order);
+    uart_putc(' ');
+    uart_itoa(buddy_index);
+    uart_putc('\n');*/
+
+    free_child(block_index, order);
+    // First assuming no merge is needed
+    cur_block->val = order;
+    int i;
+    for(i = order; i < MAX_ORDER; i++){
+        // To prevet the case that block index is not a block in larger block level
+        block_index = find_min(block_index, buddy_index);
+        buddy_index = find_buddy(block_index, i);
+        cur_block = (buddy_block_list_t *)buddy->list_addr[i] + (block_index / (1 << i)) * sizeof(buddy_block_list_t);
+        buddy_block = (buddy_block_list_t *)buddy->list_addr[i] + (buddy_index / (1 << i)) * sizeof(buddy_block_list_t);
+
+        // reaching largest block, no need to merge
+        if(i == MAX_ORDER - 1){
+            cur_block->val = i;;
+            break;
+        }
+
+        // its buddy is also available, combine them into a larger block
+        if(buddy_block->val >= 0){
+            cur_block->val = -2;
+            buddy_block->val = -2;
+            uart_puts("Merge two blocks:");
+            uart_itoa(block_index);
+            uart_putc(' ');
+            uart_itoa(buddy_index);
+            uart_puts(" at order:");
+            uart_itoa(i);
+            uart_putc('\n');
+        }
+        else{
+            cur_block->val = i;
+            break;
+        }
+    }
+
+    // update the first available block
+    for(i = 0; i < MAX_ORDER; i++){
+        buddy->first_avail[i] = get_next_avail(i);
+        uart_itoa(buddy->first_avail[i]);
+        uart_putc(' ');
+    }
     uart_putc('\n');
+
+    for(i = 0; i < MAX_ORDER; i++){
+        int j = 0;
+        int block_amount = (1 << (MAX_ORDER - i - 1));
+        buddy_block_list_t *list_cur = buddy->list_addr[i];
+        for(j = 0; j < block_amount; j++){
+
+            uart_itoa(list_cur->val);
+            uart_putc(' ');
+            list_cur = list_cur->next;
+        }
+        uart_putc('\n');
+    }
 }

@@ -37,10 +37,10 @@ void c_exception_handler(){
     uart_putc('\n');
 
     uart_puts("Leaving exception handler\n");
-    // It will keep printing as next line of boot.S is 'b exception_handler'
-    /*while(1){
+    
+    while(1){
         asm volatile("nop");
-    }*/
+    }
 }
 
 void c_core_timer_handler(){
