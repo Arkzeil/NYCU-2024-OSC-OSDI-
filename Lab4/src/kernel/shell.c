@@ -178,6 +178,10 @@ void my_shell(){
             buddy_free((void*)0x10001A28);
             buddy_free((void*)0x10002A28);
             buddy_free((void*)0x10004A28);
+            pool_alloc(16);
+            pool_alloc(16);
+            pool_free(pool_alloc(10));
+            pool_free(pool_alloc(1025));
         }
         else{
             uart_puts("Unknown Command: ");

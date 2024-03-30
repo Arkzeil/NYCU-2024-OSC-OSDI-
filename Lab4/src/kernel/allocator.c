@@ -5,6 +5,14 @@ int offset = 0;
 buddy_system_t *buddy = 0;
 void *buddy_mem_start = 0;
 
+int pool_sizes[NUM_POOLS] = {16, 32, 48, 196, 512, 1024};
+// lists for each pool
+void *free_lists[NUM_POOLS][MAX_CHUNKS_PER_POOL];
+// record that page frame belongs to which pool
+int pool_page_addr[(1 << (MAX_ORDER - 1))];
+// record the number of free small blocks in each pool
+int free_list_counts[NUM_POOLS];
+
 void* simple_malloc(unsigned int size){
     // 64bits=8bytes
     size += align_offset(size, 8);
@@ -324,4 +332,99 @@ void buddy_free(void *addr){
         }
         uart_putc('\n');
     }
+}
+
+void* mymalloc(unsigned int size){
+    if(size < PAGE_SIZE){
+        return simple_malloc(size);
+    }
+    else
+        return buddy_malloc(size);
+}
+
+void pool_init() {
+    int i;
+    for(i = 0; i < NUM_POOLS; i++){
+        free_list_counts[i] = 0;
+    }
+    for(i = 0; i < (1 << (MAX_ORDER - 1)); i++){
+        pool_page_addr[i] = -1;
+    }
+}
+
+void *pool_alloc(unsigned int size) {
+    int pool_idx;
+    for(pool_idx = 0; pool_idx < NUM_POOLS; pool_idx++){
+        if (pool_sizes[pool_idx] >= size)
+            break;
+    }
+
+    // Exceed pool size, give it a whole page frame
+    if(pool_idx == NUM_POOLS)
+        return buddy_malloc(4096);
+
+    if(free_list_counts[pool_idx] <= 0) {
+        // Allocate a new page frame from the buddy system
+        void *page = buddy_malloc(4096); //4K page(min. in buddy system)
+        if(page == 0){
+            uart_puts("No available memory\n");
+            return 0;
+        }
+
+        int num_chunks = PAGE_SIZE / pool_sizes[pool_idx];
+        void *chunks = page;
+
+        pool_page_addr[get_index(page)] = pool_idx;
+        // Initialize the free list for the new page
+        for (int i = 0; i < num_chunks; i++) {
+            // i * pool_sizes[pool_idx] * char(1byte) to get the address of the chunk
+            free_lists[pool_idx][free_list_counts[pool_idx]++] = &((char *)chunks)[i * pool_sizes[pool_idx]];
+            //uart_b2x_64((unsigned long long)free_lists[pool_idx][free_list_counts[pool_idx] - 1]);
+            //uart_putc(' ');
+        }
+        uart_putc('\n');
+
+        uart_puts("Allocated memory pool size: ");
+        uart_itoa(pool_sizes[pool_idx]);
+        uart_puts(" at page frame index: ");
+        uart_itoa(get_index(page));
+        uart_putc('\n');
+    }
+
+    int cur_idx = free_list_counts[pool_idx] - 1;
+    // Allocate a chunk from the free list
+    void *chunk = free_lists[pool_idx][--free_list_counts[pool_idx]];
+
+    uart_puts("Allocated memory pool size: ");
+    uart_itoa(pool_sizes[pool_idx]);
+    uart_puts(" at address: ");
+    uart_b2x_64((unsigned long long)chunk);
+    uart_puts(" ,with index: ");
+    uart_itoa(cur_idx);
+    uart_putc('\n');
+
+    return chunk;
+}
+
+void pool_free(void *ptr){
+    // Determine the pool based on the address
+    int pool_idx = -1;
+    int offset = (char *)ptr - (char *)BUDDY_START;
+    if(offset < PAGE_SIZE * (1 << (MAX_ORDER - 1))){
+        // get the index of the block, then get the pool index
+        pool_idx = pool_page_addr[offset / PAGE_SIZE];
+    }
+
+    if(pool_idx == -1)
+        return; // Invalid pointer
+
+    uart_puts("Freed memory pool with index: ");
+    uart_itoa(free_list_counts[pool_idx]);
+    uart_putc('\n');
+
+    free_lists[pool_idx][free_list_counts[pool_idx]++] = ptr;
+}
+
+void memory_reserve(start, end){
+    
 }

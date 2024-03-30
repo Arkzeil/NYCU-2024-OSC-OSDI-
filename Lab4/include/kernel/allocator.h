@@ -4,11 +4,16 @@
 #include "kernel/utils.h"
 #include "kernel/uart.h"
 
-#define MAX_HEAP_SIZE 8192
-#define PAGE_SIZE   4096
-#define MAX_ORDER   6
-#define BUDDY_START 0x10000000
-#define BUDDY_END   0x20000000
+#define MAX_HEAP_SIZE       8192
+#define PAGE_SIZE           4096
+#define MAX_ORDER           6
+#define BUDDY_START         0x10000000
+#define BUDDY_END           0x20000000
+#define BUDDY_METADATA_ADDR 0x10000000
+// the number of memory pools
+#define NUM_POOLS   6
+#define MIN_POOL_SIZE 16
+#define MAX_CHUNKS_PER_POOL (PAGE_SIZE / MIN_POOL_SIZE)
 // Get the symbol __end from linker script
 extern char* __end;
 // make allocated variable global among all files
@@ -54,5 +59,10 @@ void* simple_malloc(unsigned int size);
 void buddy_init(void);
 void* buddy_malloc(unsigned int size);
 void buddy_free(void *addr);
+// a wrapper for buddy malloc, which will use memory pool if the size is smaller than a page
+void* pool_alloc(unsigned int size);
+void pool_free(void *ptr);
+
+void memory_reserve(start, end);
 
 #endif
