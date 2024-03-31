@@ -3,12 +3,14 @@
 
 #include "kernel/utils.h"
 #include "kernel/uart.h"
+#include "kernel/dtb.h"
+#include "kernel/cpio.h"
 
 #define MAX_HEAP_SIZE       8192
 #define PAGE_SIZE           4096
-#define BUDDY_START         0x10000000
+#define BUDDY_START         0x0
 #define BUDDY_END           0x3C000000
-#define MAX_ORDER           6          // 2^17 ~= 128KB page frames = 512MB
+#define MAX_ORDER           11          // 2^17 ~= 128KB page frames = 512MB
 #define BUDDY_METADATA_ADDR 0x10000000
 // the number of memory pools
 #define NUM_POOLS   6
@@ -57,12 +59,14 @@ extern buddy_system_t *buddy;
 // return requested 'size' bytes which are continuous space
 void* simple_malloc(unsigned int size);
 void buddy_init(void);
+void show_mem_stat(void);
 void* buddy_malloc(unsigned int size);
 void buddy_free(void *addr);
 // a wrapper for buddy malloc, which will use memory pool if the size is smaller than a page
 void* pool_alloc(unsigned int size);
 void pool_free(void *ptr);
-
 void memory_reserve(void* start,void* end);
+
+void startup_init(void);
 
 #endif

@@ -14,9 +14,6 @@ void my_shell(){
     for(buf_index = 0; buf_index < 5; buf_index++)
         argv[buf_index] = simple_malloc(MAX_ARGV_LEN);
 
-    uart_puts("Set boot timer to 0\n");
-    boot_timer_flag = 0;
-
     while(1){
         buf_index = 0;
         string_set(buf, 0, MAX_BUF_LEN);

@@ -36,7 +36,8 @@ void buddy_init(void){
 
     //buddy_block_list_t buddy_list[MAX_ORDER];
     // the location where available memory starts(after all metadata)
-    buddy_mem_start = (void*)(BUDDY_START + sizeof(buddy_system_t) + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));
+    //buddy_mem_start = (void*)(BUDDY_START + sizeof(buddy_system_t) + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));
+    buddy_mem_start = (void*)(BUDDY_START);
     // the head of current size blocks
     buddy_block_list_t *list = (buddy_block_list_t *)(buddy->buddy_list);
 
@@ -54,8 +55,9 @@ void buddy_init(void){
             cur->idx = (j * (1 << i));
             // first, all block except largest one are belonged to the largest continuous memory block
             cur->val = -2;
-            if(i == MAX_ORDER - 1)
+            if(i == MAX_ORDER - 1){
                 cur->val = MAX_ORDER - 1;
+            }
             if(cur != buddy_mem_start){
                 cur->prev = cur - sizeof(buddy_block_list_t);
                 cur->prev->next = cur;
@@ -74,10 +76,36 @@ void buddy_init(void){
         // goto next block list
         list += block_amount * sizeof(buddy_block_list_t);
     }
-
     // In the begining, only the largest block is available
     buddy->first_avail[MAX_ORDER - 1] = 0;
 }
+
+void show_mem_stat(void){
+    int i;
+    for(i = 0; i < MAX_ORDER; i++){
+        uart_puts("Order:");
+        uart_itoa(i);
+        uart_puts(" First Available:");
+        uart_itoa(buddy->first_avail[i]);
+        uart_puts(" Available Blocks:");
+        int avails = 0;
+        buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[i];
+        int j;
+        int block_amount = (1 << (MAX_ORDER - i - 1));
+        for(j = 0; j < block_amount; j++){
+            if(cur->val >= 0){
+                avails++;
+                //uart_itoa(cur->val);
+                //uart_putc(' ');
+            }
+            cur = cur->next;
+        }
+        uart_itoa(avails);
+        uart_putc('\n');
+    }
+    uart_putc('\n');
+}
+
 // get buddy of one level lower order
 int find_buddy(int index, int order){
     return index ^ (1 << order);
@@ -278,6 +306,13 @@ void buddy_free(void *addr){
     uart_putc(' ');
     uart_itoa(buddy_index);
     uart_putc('\n');*/
+    uart_puts("Free :");
+    uart_b2x_64((unsigned long long)addr);
+    uart_puts(" with size:");
+    uart_itoa(cur_block->size);
+    uart_puts(" at index:");
+    uart_itoa(block_index);
+    uart_putc('\n');
 
     free_child(block_index, order);
     // First assuming no merge is needed
@@ -432,6 +467,17 @@ void memory_reserve(void* start,void* end){
     int end_index = get_index(end);
     int i;
 
+    uart_puts("Reserve memory from:");
+    uart_b2x_64((unsigned long long)start);
+    uart_puts(" to:");
+    uart_b2x_64((unsigned long long)end);
+    uart_putc(' ');
+    uart_puts("with index:");
+    uart_itoa(start_index);
+    uart_putc(' ');
+    uart_itoa(end_index);
+    uart_putc('\n');
+
     // mark lowest level blocks as allocated(-1), higher level blocks as dividing into smaller blocks(-3) 
     for(i = 0; i < MAX_ORDER; i++){
         int j;
@@ -439,7 +485,9 @@ void memory_reserve(void* start,void* end){
             buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[i] + (j / (1 << i)) * sizeof(buddy_block_list_t);
             buddy_block_list_t *buddy_block = (buddy_block_list_t *)buddy->list_addr[i] + (find_buddy(j, i) / (1 << i)) * sizeof(buddy_block_list_t);
             if(cur->val == -1){
-                uart_puts("Error: The block is already allocated\n");
+                uart_puts("Warning: The block is already allocated(reserved) in:");
+                uart_b2x_64((unsigned long long)cur->addr);
+                uart_putc('\n');
                 return;
             }
 
@@ -455,10 +503,10 @@ void memory_reserve(void* start,void* end){
     // update the first available block
     for(i = 0; i < MAX_ORDER; i++){
         buddy->first_avail[i] = get_next_avail(i);
-        uart_itoa(buddy->first_avail[i]);
-        uart_putc(' ');
+        //uart_itoa(buddy->first_avail[i]);
+        //uart_putc(' ');
     }
-    uart_putc('\n');
+    /*uart_putc('\n');
     for(i = 0; i < MAX_ORDER; i++){
         int j = 0;
         int block_amount = (1 << (MAX_ORDER - i - 1));
@@ -469,5 +517,22 @@ void memory_reserve(void* start,void* end){
             list_cur = list_cur->next;
         }
         uart_putc('\n');
-    }
+    }*/
+}
+
+void startup_init(void){
+    buddy_init();
+    show_mem_stat();
+    //memory_reserve((void*)0x10000000, (void*)buddy->list_addr[MAX_ORDER - 1] + sizeof(buddy_block_list_t));
+    //show_mem_stat();
+    memory_reserve((void*)0x0, (void*)0x1000);
+    show_mem_stat();
+    memory_reserve((void*)0x1000, (void*)0x80000);
+    show_mem_stat();
+    /*memory_reserve((void*)0x80000, (void*)0x80000 + 0x30000);
+    show_mem_stat();
+    memory_reserve((void*)cpio_addr, (void*)cpio_addr + 0x100000);
+    show_mem_stat();
+    memory_reserve((void*)_dtb_addr, (void*)&_dtb_addr + 0x30000);
+    show_mem_stat();*/
 }

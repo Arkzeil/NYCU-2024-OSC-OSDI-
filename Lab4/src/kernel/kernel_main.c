@@ -41,7 +41,10 @@ void main(void)
     uart_b2x_64((unsigned long long)el>>2);     // bits [3:2] contain current El value
     uart_putc('\n');
 
+    uart_puts("Set boot timer to 0\n");
+    boot_timer_flag = 0;
     //uart_irq_on();
+    startup_init();
 
     my_shell();
 }
