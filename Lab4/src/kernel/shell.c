@@ -168,20 +168,38 @@ void my_shell(){
         }
         else if(!string_comp(buf, "buddy")){
             buddy_init();
-            buddy_malloc(4096);
-            buddy_malloc(4096);
-            buddy_malloc(4096);
-            buddy_malloc(8192);
-            buddy_malloc(8193);
-            buddy_free((void*)0x10008A28);
-            buddy_free((void*)0x10000A28);
-            buddy_free((void*)0x10001A28);
-            buddy_free((void*)0x10002A28);
-            buddy_free((void*)0x10004A28);
+            memory_reserve((void*)0x10003A28, (void*)0x10003A28 + 0x1000);
+            uart_puts("-----------------\n");
+            void *a1 = buddy_malloc(4096);
+            uart_puts("-----------------\n");
+            void *a12 = buddy_malloc(4096);
+            uart_puts("-----------------\n");
+            void *a13 = buddy_malloc(4096);
+            uart_puts("-----------------\n");
+            void *a8 = buddy_malloc(8192);
+            uart_puts("-----------------\n");
+            void *a82 = buddy_malloc(8193);
+            uart_puts("-----------------\n");
+            uart_puts("start free\n");
+            buddy_free(a82);
+            uart_puts("-----------------\n");
+            buddy_free(a1);
+            uart_puts("-----------------\n");
+            buddy_free(a12);
+            uart_puts("-----------------\n");
+            buddy_free(a13);
+            uart_puts("-----------------\n");
+            buddy_free(a8);
+            uart_puts("End free");
+            uart_puts("-----------------\n");
             pool_alloc(16);
+            uart_puts("-----------------\n");
             pool_alloc(16);
+            uart_puts("-----------------\n");
             pool_free(pool_alloc(10));
+            uart_puts("-----------------\n");
             pool_free(pool_alloc(1025));
+            uart_puts("-----------------\n");
         }
         else{
             uart_puts("Unknown Command: ");

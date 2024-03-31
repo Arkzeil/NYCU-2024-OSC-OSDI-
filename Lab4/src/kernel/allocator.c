@@ -31,8 +31,8 @@ void* simple_malloc(unsigned int size){
 
 void buddy_init(void){
     int i;
-    buddy = (buddy_system_t*)BUDDY_START;
-    buddy->buddy_list = (buddy_block_list_t**)(BUDDY_START + sizeof(buddy_system_t));
+    buddy = (buddy_system_t*)BUDDY_METADATA_ADDR;
+    buddy->buddy_list = (buddy_block_list_t**)(BUDDY_METADATA_ADDR + sizeof(buddy_system_t));
 
     //buddy_block_list_t buddy_list[MAX_ORDER];
     // the location where available memory starts(after all metadata)
@@ -137,7 +137,9 @@ buddy_block_list_t* buddy_split(int start_index, int end_index, int req_size, in
                 cur->val = i;
                 if(cur != start){
                     uart_puts("Release redundent block:");
-                    uart_b2x_64((unsigned long long)cur->size);
+                    uart_itoa(cur->size);
+                    uart_puts(" at: ");
+                    uart_b2x_64((unsigned long long)cur->addr);
                     uart_putc('\n');
                 }
                 //buddy->first_avail[i] = get_next_avail(i);
@@ -283,7 +285,7 @@ void buddy_free(void *addr){
     int i;
     for(i = order; i < MAX_ORDER; i++){
         // To prevet the case that block index is not a block in larger block level
-        block_index = find_min(block_index, buddy_index);
+        //block_index = find_min(block_index, buddy_index);
         buddy_index = find_buddy(block_index, i);
         cur_block = (buddy_block_list_t *)buddy->list_addr[i] + (block_index / (1 << i)) * sizeof(buddy_block_list_t);
         buddy_block = (buddy_block_list_t *)buddy->list_addr[i] + (buddy_index / (1 << i)) * sizeof(buddy_block_list_t);
@@ -425,6 +427,47 @@ void pool_free(void *ptr){
     free_lists[pool_idx][free_list_counts[pool_idx]++] = ptr;
 }
 
-void memory_reserve(start, end){
-    
+void memory_reserve(void* start,void* end){
+    int start_index = get_index(start);
+    int end_index = get_index(end);
+    int i;
+
+    // mark lowest level blocks as allocated(-1), higher level blocks as dividing into smaller blocks(-3) 
+    for(i = 0; i < MAX_ORDER; i++){
+        int j;
+        for(j = start_index; j <= end_index; j++){
+            buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[i] + (j / (1 << i)) * sizeof(buddy_block_list_t);
+            buddy_block_list_t *buddy_block = (buddy_block_list_t *)buddy->list_addr[i] + (find_buddy(j, i) / (1 << i)) * sizeof(buddy_block_list_t);
+            if(cur->val == -1){
+                uart_puts("Error: The block is already allocated\n");
+                return;
+            }
+
+            if(cur->val >= 0 || cur->val == -2)
+                cur->val = -3;
+            // if buddy is not allocated, mark it as usable as higher level will be marked as -3
+            if(buddy_block->val == -2)
+                buddy_block->val = i;    
+            if(i == 0)
+                cur->val = -1;
+        }
+    }
+    // update the first available block
+    for(i = 0; i < MAX_ORDER; i++){
+        buddy->first_avail[i] = get_next_avail(i);
+        uart_itoa(buddy->first_avail[i]);
+        uart_putc(' ');
+    }
+    uart_putc('\n');
+    for(i = 0; i < MAX_ORDER; i++){
+        int j = 0;
+        int block_amount = (1 << (MAX_ORDER - i - 1));
+        buddy_block_list_t *list_cur = buddy->list_addr[i];
+        for(j = 0; j < block_amount; j++){
+            uart_itoa(list_cur->val);
+            uart_putc(' ');
+            list_cur = list_cur->next;
+        }
+        uart_putc('\n');
+    }
 }

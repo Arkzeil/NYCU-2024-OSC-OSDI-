@@ -6,9 +6,9 @@
 
 #define MAX_HEAP_SIZE       8192
 #define PAGE_SIZE           4096
-#define MAX_ORDER           6
 #define BUDDY_START         0x10000000
-#define BUDDY_END           0x20000000
+#define BUDDY_END           0x3C000000
+#define MAX_ORDER           6          // 2^17 ~= 128KB page frames = 512MB
 #define BUDDY_METADATA_ADDR 0x10000000
 // the number of memory pools
 #define NUM_POOLS   6
@@ -63,6 +63,6 @@ void buddy_free(void *addr);
 void* pool_alloc(unsigned int size);
 void pool_free(void *ptr);
 
-void memory_reserve(start, end);
+void memory_reserve(void* start,void* end);
 
 #endif
