@@ -34,6 +34,7 @@ void my_shell(){
             uart_puts("reboot   :Reboot the device\n");
             uart_puts("ls       :list all files in initramfs\n");
             uart_puts("cat      :show the content of file\n");
+            uart_puts("aloc     :allocate a string\n");
             uart_puts("el0      :execute programs in initramfs in El0\n");
             uart_puts("async    :try the async I/O\n");
             uart_puts("off      :turn off the 2 seconds timer\n");
@@ -78,6 +79,21 @@ void my_shell(){
             cpio_cat(buf);
 
             continue;
+        }
+        else if(!string_comp(buf, "aloc")){
+            char* string = pool_alloc(8);
+
+            string[0] = 'S';
+            string[1] = 't';
+            string[2] = 'r';
+            string[3] = 'i';
+            string[4] = 'n';
+            string[5] = 'g';
+            string[6] = '!';
+            string[7] = '\0';
+            uart_puts(string);
+            uart_putc('\n');
+            show_mem_stat();
         }
         else if(!string_comp(buf, "el0")){
             void *file_addr;

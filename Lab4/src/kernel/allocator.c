@@ -82,10 +82,11 @@ void buddy_init(void){
 
 void show_mem_stat(void){
     int i;
+    int avail_pages = 0;
     for(i = 0; i < MAX_ORDER; i++){
         uart_puts("Order:");
         uart_itoa(i);
-        uart_puts(" First Available:");
+        uart_puts(" First Available index:");
         uart_itoa(buddy->first_avail[i]);
         uart_puts(" Available Blocks:");
         int avails = 0;
@@ -95,15 +96,34 @@ void show_mem_stat(void){
         for(j = 0; j < block_amount; j++){
             if(cur->val >= 0){
                 avails++;
-                //uart_itoa(cur->val);
-                //uart_putc(' ');
+                uart_itoa(j);
+                uart_putc(' ');
+                avail_pages += (1 << i);
             }
             cur = cur->next;
         }
         uart_itoa(avails);
         uart_putc('\n');
     }
+    //uart_putc('\n');
+    uart_puts("Total available Pages:");
+    uart_itoa(avail_pages);
     uart_putc('\n');
+}
+void show_buddy_system_stat(void){
+    int i;
+    for(i = 0; i < MAX_ORDER; i++){
+        int j = 0;
+        int block_amount = (1 << (MAX_ORDER - i - 1));
+        buddy_block_list_t *list_cur = buddy->list_addr[i];
+        for(j = 0; j < block_amount; j++){
+
+            uart_itoa(list_cur->val);
+            uart_putc(' ');
+            list_cur = list_cur->next;
+        }
+        uart_putc('\n');
+    }
 }
 
 // get buddy of one level lower order
@@ -145,6 +165,8 @@ buddy_block_list_t* get_block(int index){
 
 buddy_block_list_t* buddy_split(int start_index, int end_index, int req_size, int order){
     int i;
+    // to get relative offset as we need to cut it to half while spliting
+    end_index -= start_index;
     // if the current block is already the smallest block that can be allocated or smaller block is not enough for the request
     if((PAGE_SIZE * (1 << order) / 2) < req_size || order == 0){
         //buddy->first_avail[order] = get_next_avail(order);
@@ -159,7 +181,7 @@ buddy_block_list_t* buddy_split(int start_index, int end_index, int req_size, in
         buddy_block_list_t *start = (buddy_block_list_t *)buddy->list_addr[i] + (start_index / (1 << i)) * sizeof(buddy_block_list_t);
         buddy_block_list_t *cur = (buddy_block_list_t *)start;
 
-        for(; j < end_index && cur != 0; j += (1 << i)){
+        for(; j < start_index + end_index && cur != 0; j += (1 << i)){
             // mark it as usable
             if(cur->val == -2){
                 cur->val = i;
@@ -172,8 +194,11 @@ buddy_block_list_t* buddy_split(int start_index, int end_index, int req_size, in
                 }
                 //buddy->first_avail[i] = get_next_avail(i);
             }
+            //uart_b2x_64((unsigned long long)cur->val);
+            //uart_putc(' ');
             cur = cur->next;
         }
+        //uart_putc('\n');
         end_index /= 2;
 
         start->val = -3;
@@ -253,23 +278,12 @@ void* buddy_malloc(unsigned int size){
                 buddy_block_list_t *buddy_allocated = buddy_split(avail_index, avail_index + (1 << i), size, i);
                 mark_allocated(buddy_allocated);
 
-
-                for(i = 0; i < MAX_ORDER; i++){
-                    int j = 0;
-                    int block_amount = (1 << (MAX_ORDER - i - 1));
-                    buddy_block_list_t *list_cur = buddy->list_addr[i];
-                    for(j = 0; j < block_amount; j++){
-
-                        uart_itoa(list_cur->val);
-                        uart_putc(' ');
-                        list_cur = list_cur->next;
-                    }
-                    uart_putc('\n');
-                }
+                //show_buddy_system_stat();
+                int k;
                 // update the first available block
-                for(i = 0; i < MAX_ORDER; i++){
-                    buddy->first_avail[i] = get_next_avail(i);
-                    uart_itoa(buddy->first_avail[i]);
+                for(k = 0; k < MAX_ORDER; k++){
+                    buddy->first_avail[k] = get_next_avail(k);
+                    uart_itoa(buddy->first_avail[k]);
                     uart_putc(' ');
                 }
                 uart_putc('\n');
@@ -357,18 +371,7 @@ void buddy_free(void *addr){
     }
     uart_putc('\n');
 
-    for(i = 0; i < MAX_ORDER; i++){
-        int j = 0;
-        int block_amount = (1 << (MAX_ORDER - i - 1));
-        buddy_block_list_t *list_cur = buddy->list_addr[i];
-        for(j = 0; j < block_amount; j++){
-
-            uart_itoa(list_cur->val);
-            uart_putc(' ');
-            list_cur = list_cur->next;
-        }
-        uart_putc('\n');
-    }
+    //show_buddy_system_stat();
 }
 
 void* mymalloc(unsigned int size){
@@ -463,6 +466,11 @@ void pool_free(void *ptr){
 }
 
 void memory_reserve(void* start,void* end){
+    if(start < (void*)BUDDY_START || end > (void*)BUDDY_END){
+        uart_puts("Error: The memory is out of range\n");
+        return;
+    }
+
     int start_index = get_index(start);
     int end_index = get_index(end);
     int i;
@@ -478,17 +486,17 @@ void memory_reserve(void* start,void* end){
     uart_itoa(end_index);
     uart_putc('\n');
 
-    // mark lowest level blocks as allocated(-1), higher level blocks as dividing into smaller blocks(-3) 
+    // mark lowest level(0) blocks as allocated(-1), higher level blocks as dividing into smaller blocks(-3) 
     for(i = 0; i < MAX_ORDER; i++){
-        int j;
-        for(j = start_index; j <= end_index; j++){
+        int j = start_index;
+        do{
             buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[i] + (j / (1 << i)) * sizeof(buddy_block_list_t);
             buddy_block_list_t *buddy_block = (buddy_block_list_t *)buddy->list_addr[i] + (find_buddy(j, i) / (1 << i)) * sizeof(buddy_block_list_t);
             if(cur->val == -1){
                 uart_puts("Warning: The block is already allocated(reserved) in:");
                 uart_b2x_64((unsigned long long)cur->addr);
                 uart_putc('\n');
-                return;
+                //return;
             }
 
             if(cur->val >= 0 || cur->val == -2)
@@ -498,7 +506,8 @@ void memory_reserve(void* start,void* end){
                 buddy_block->val = i;    
             if(i == 0)
                 cur->val = -1;
-        }
+            j++;
+        }while(j < end_index);
     }
     // update the first available block
     for(i = 0; i < MAX_ORDER; i++){
@@ -506,18 +515,6 @@ void memory_reserve(void* start,void* end){
         //uart_itoa(buddy->first_avail[i]);
         //uart_putc(' ');
     }
-    /*uart_putc('\n');
-    for(i = 0; i < MAX_ORDER; i++){
-        int j = 0;
-        int block_amount = (1 << (MAX_ORDER - i - 1));
-        buddy_block_list_t *list_cur = buddy->list_addr[i];
-        for(j = 0; j < block_amount; j++){
-            uart_itoa(list_cur->val);
-            uart_putc(' ');
-            list_cur = list_cur->next;
-        }
-        uart_putc('\n');
-    }*/
 }
 
 void startup_init(void){
@@ -525,14 +522,21 @@ void startup_init(void){
     show_mem_stat();
     //memory_reserve((void*)0x10000000, (void*)buddy->list_addr[MAX_ORDER - 1] + sizeof(buddy_block_list_t));
     //show_mem_stat();
+    // reserve Spin tables for multicore boot 
     memory_reserve((void*)0x0, (void*)0x1000);
     show_mem_stat();
     memory_reserve((void*)0x1000, (void*)0x80000);
     show_mem_stat();
-    /*memory_reserve((void*)0x80000, (void*)0x80000 + 0x30000);
+    // reserve Kernel image in the physical memory
+    memory_reserve((void*)&_start, (void*)&__end);
     show_mem_stat();
+    // reserve the CPIO archive in the physical memory
     memory_reserve((void*)cpio_addr, (void*)cpio_addr + 0x100000);
     show_mem_stat();
-    memory_reserve((void*)_dtb_addr, (void*)&_dtb_addr + 0x30000);
-    show_mem_stat();*/
+    // reserve the device tree blob in the physical memory
+    memory_reserve((void*)_dtb_addr, (void*)_dtb_addr + 0x30000);
+    show_mem_stat();
+    // reserve allocator metadata in the physical memory
+    memory_reserve((void*)BUDDY_METADATA_ADDR, (void*)BUDDY_METADATA_ADDR + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));
+    show_mem_stat();
 }

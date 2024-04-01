@@ -10,7 +10,7 @@
 #define PAGE_SIZE           4096
 #define BUDDY_START         0x0
 #define BUDDY_END           0x3C000000
-#define MAX_ORDER           11          // 2^17 ~= 128KB page frames = 512MB
+#define MAX_ORDER           18          // 2^17 ~= 128KB page frames = 512MB
 #define BUDDY_METADATA_ADDR 0x10000000
 // the number of memory pools
 #define NUM_POOLS   6
@@ -18,6 +18,7 @@
 #define MAX_CHUNKS_PER_POOL (PAGE_SIZE / MIN_POOL_SIZE)
 // Get the symbol __end from linker script
 extern char* __end;
+extern char* _start;
 // make allocated variable global among all files
 extern char* allocated;
 extern int offset;
