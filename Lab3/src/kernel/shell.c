@@ -115,7 +115,7 @@ void my_shell(){
         else if(!string_comp(buf, "async")){
             char async_buf[MAX_BUF_LEN];
             int ticks = 150;
-
+            int_on();
             uart_irq_on();
 
             uart_irq_puts("Async I/O test:");
@@ -163,6 +163,22 @@ void my_shell(){
 
             ExecTasks();
         }
+        else if(!string_comp(buf, "test")){
+            test_NI = h2i(argv[0], string_len(argv[0]));
+            PRI_TEST_FLAG = 0;
+
+            uart_itoa(test_NI);
+            uart_putc('\n');
+
+            uart_irq_on();
+            uart_puts("Press a key to test nested interrupt\n");
+            while(PRI_TEST_FLAG == 0){
+                if(PRI_TEST_FLAG == 1)
+                    break;
+            }
+            uart_irq_off();
+            test_NI = 0;
+        }
         /*else if(!string_comp(buf, "test")){
             buf_index = 0;
             string_set(buf, 0, MAX_BUF_LEN);
@@ -193,5 +209,6 @@ void my_shell(){
             uart_puts("Unknown Command: ");
             uart_puts(buf);
         }
+
     }
 }

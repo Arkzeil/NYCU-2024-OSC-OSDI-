@@ -116,6 +116,32 @@ void uart_puts_fixed(const char *str, int len){
     }
 }
 
+void uart_itoa(int num){
+    char str[12];
+    int i = 0;
+    int j = 0;
+    int is_negative = 0;
+
+    if(num < 0){
+        is_negative = 1;
+        num = -num;
+    }
+
+    do{
+        str[i++] = num % 10 + '0';
+        num /= 10;
+    }while(num);
+
+    if(is_negative)
+        str[i++] = '-';
+
+    str[i] = '\0';
+
+    for(j = i - 1; j >= 0; j--){
+        uart_putc(str[j]);
+    }
+}
+
 void uart_b2x(unsigned int b){
     int i;
     unsigned int t;
@@ -280,21 +306,24 @@ int uart_irq_gets(char *buf){
 
 void uart_irq_on(){
     *AUX_MU_IER_REG     |=   1;  //enable receive interrupt(transmit will be handled in its function)
+    *AUX_MU_IER_REG     |=   1;  //enable transmit interrupt
     *Enable_IRQs_1      |=   (1<<29);
 }
 
 void uart_irq_off(){
     mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG & ~(0x1));  //disable receive interrupt
+    mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG & ~(0x2));  //disable transmit interrupt
     *Disable_IRQs_1     |=   (1<<29);
 }
 
 int uart_irq_getc(){
     // there's char in buffer
     if(read_index_cur != read_index_tail){
+        int_off();
         int c = (int)read_buffer[read_index_cur++];
         // make it circular
         read_index_cur = read_index_cur % MAX_BUF_LEN;
-
+        int_on();
         return c;
     }
     else
@@ -302,15 +331,19 @@ int uart_irq_getc(){
 }
 
 void uart_irq_putc(unsigned char c){
+    int_off();
+
     write_buffer[write_index_tail++] = c;
     write_index_tail = write_index_tail % MAX_BUF_LEN;
+    
+    int_on();
     //p.12 The AUX_MU_IER_REG register is primary used to enable interrupts 
     mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | 0x2);
 }
 
 void uart_irq_puts(const char *str){
     int i;
-
+    int_off();
     for(i = 0; str[i] != '\0'; i++){
         if(str[i] == '\n'){
             write_buffer[write_index_tail++] = '\r';
@@ -319,6 +352,7 @@ void uart_irq_puts(const char *str){
         write_buffer[write_index_tail++] = str[i];
         write_index_tail = write_index_tail % MAX_BUF_LEN;
     }
+    int_on();
 
     mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | 0x2);
 }
