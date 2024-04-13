@@ -41,6 +41,7 @@ void my_shell(){
             uart_puts("settimeout: set the timeout for the task\n");
             uart_puts("timer    :run the timer interrupt test\n");
             uart_puts("task     :run the task test\n");
+            uart_puts("thread   :run the thread test\n");
         }
         else if(!string_comp(buf, "hello")){
             uart_puts("Hello World!\n");
@@ -213,6 +214,14 @@ void my_shell(){
             uart_puts("-----------------\n");
             pool_free(pool_alloc(1025));
             uart_puts("-----------------\n");
+        }
+        else if(!string_comp(buf, "thread")){
+            int i = 0;
+            thread_init();
+            
+            for(; i < 5; i++)
+                thread_create(foo, 0);
+            
         }
         else{
             uart_puts("Unknown Command: ");
