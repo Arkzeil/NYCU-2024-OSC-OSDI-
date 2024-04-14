@@ -142,15 +142,12 @@ void gdb_brk(){
     uart_puts("this is just for gdb\n");
 }
 void handler1(){
-    int clock = 1000;
     // clear register to prevent keeping interrupting
     uart_getc();
     uart_puts("handler1\n");
     // use write interrupt to test nested interrupt
     mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | (0x2));
-    while(clock--){
-        
-    }
+    delay(10000);
     uart_puts("handler1 end\n");
     PRI_TEST_FLAG = 1;
     gdb_brk();

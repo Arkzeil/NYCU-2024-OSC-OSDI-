@@ -306,7 +306,7 @@ int uart_irq_gets(char *buf){
 
 void uart_irq_on(){
     *AUX_MU_IER_REG     |=   1;  //enable receive interrupt(transmit will be handled in its function)
-    *AUX_MU_IER_REG     |=   1;  //enable transmit interrupt
+    *AUX_MU_IER_REG     |=   2;  //enable transmit interrupt
     *Enable_IRQs_1      |=   (1<<29);
 }
 

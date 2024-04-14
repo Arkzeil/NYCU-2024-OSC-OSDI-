@@ -24,5 +24,6 @@ int align_offset(unsigned int i, unsigned int align);
 int align_mem_offset(void* i, unsigned int align);
 // convert big endian to little endian 32bits
 unsigned int BE2LE(unsigned int BE);
+void delay(unsigned int time);
 
 #endif

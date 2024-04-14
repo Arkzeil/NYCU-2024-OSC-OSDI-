@@ -173,12 +173,14 @@ void prep_task(void){
 
         if(task_head == 0){
             int_on();
+            delay(150);
             break;
         }
         
         // not execute if the task has lower priority
         if(cur_priority <= cur->priority){
             int_on();
+            delay(150);
             break;
         }
         // next task got higher priority, prepare to execute it
@@ -193,12 +195,15 @@ void prep_task(void){
         cur_priority = cur->priority;
 
         int_on();
+        delay(150);
         // execute task
         cur->callback(cur->data);
         int_off();
+        delay(150);
         // task finished, restore priority
         cur_priority = prev;
         int_on();
+        delay(150);
         // free(cur)
 
     }
