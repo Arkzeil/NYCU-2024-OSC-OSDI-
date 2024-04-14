@@ -218,10 +218,11 @@ void my_shell(){
         else if(!string_comp(buf, "thread")){
             int i = 0;
             thread_init();
-            
+
             for(; i < 5; i++)
                 thread_create(foo, 0);
             
+            idle_task();
         }
         else{
             uart_puts("Unknown Command: ");

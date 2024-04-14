@@ -34,13 +34,11 @@ typedef struct thread{
     struct thread *next;
     struct thread *prev;
     thread_context_t context;
-    void (*cb)(void);
     void *data;
     int status;             // 1 for running, 0 for waiting, -1 for zombie
     int pid;
 }thread_t;
 
-extern thread_t *thread_list;
 extern thread_t *cur_thread;
 extern thread_t *run_queue;
 extern thread_t *wait_queue;
@@ -49,7 +47,7 @@ extern void switch_to(void *prev, void *next);
 extern void* get_current();
 
 void thread_init(void);
-thread_t* thread_create(void (*cb)(void), void *arg);
+thread_t* thread_create(void *fn, void *arg);
 void thread_yield(void);
 void thread_exit(void);
 void kill_zombies(void);
