@@ -71,11 +71,16 @@ void schedule(void){
     }
 
     lock();
-
-    if(cur_thread == 0)
+    // if no thread is running(which is unlikely as there's an idle thread), make the first thread in run queue as running thread
+    if(cur_thread == 0){
+        uart_puts("No thread is running\n");
         cur_thread = run_queue;
+    }
     else if(cur_thread->next != 0 && cur_thread->next->status != -1) // not zombie
         cur_thread = cur_thread->next;
+    // make it circular
+    else if(cur_thread->next == 0 && run_queue->status != -1)
+        cur_thread = run_queue;
 
     cur_thread->status = 1; // running
 

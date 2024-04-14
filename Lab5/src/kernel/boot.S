@@ -163,6 +163,12 @@ general_irq_handler:
   load_all
   eret
 
+system_call_handler:
+  save_all
+  bl c_system_call_handler
+  load_all
+  eret
+
 .align 11 // vector table should be aligned to 0x800
 .global exception_vector_table
 exception_vector_table:
@@ -184,7 +190,7 @@ exception_vector_table:
   b exception_handler
   .align 7
 
-  b exception_handler
+  b system_call_handler // synchrounous exception from lower level
   .align 7
   b general_irq_handler
   .align 7

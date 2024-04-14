@@ -9,6 +9,7 @@
 #include "kernel/allocator.h"
 #include "kernel/timer.h"
 #include "kernel/task.h"
+#include "kernel/INT.h"
 #include "kernel/thread.h"
 
 void my_shell();

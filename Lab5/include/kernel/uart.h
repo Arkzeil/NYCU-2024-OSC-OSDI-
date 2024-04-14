@@ -3,6 +3,7 @@
 
 #include "kernel/gpio.h"
 #include "kernel/INT.h"
+#include "kernel/exception_hdlr.h"
 
 #define MAX_BUF_LEN 512
 #define MAX_ARGV_LEN 32
@@ -46,13 +47,13 @@ void uart_init (void);
 void uart_putc(unsigned char c);
 unsigned char uart_getc();
 unsigned int uart_puts(const char* str);
+void uart_itoa(int num);
 // output fixed length string, assuming length provided is correct
 void uart_puts_fixed(const char *str, int len);
 // binary to hex, only for mailbox
 void uart_b2x(unsigned int b);
 // for 64 bits universal version
 void uart_b2x_64(unsigned long long b);
-void uart_itoa(int num);
 // this is for returning a printable string obtained from user, usually for file name
 int uart_gets(char *buf, char **argv);
 int uart_get_fn(char *buf);
