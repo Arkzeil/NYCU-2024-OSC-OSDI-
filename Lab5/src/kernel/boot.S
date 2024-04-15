@@ -97,6 +97,9 @@ from_el2_to_el1:
     mrs x0, spsr_el1
     mrs x1, elr_el1
     stp x0, x1, [sp, 16 * 16]
+    // we need to store stack pointer in EL0 for Lab5
+    mrs x0, sp_el0
+    str x0, [sp, 16 * 17]
     // restore x0 and x1(as we just use it to save the information of spsr and elr)
     ldp x0, x1, [sp, 16 * 0] 
 .endm
@@ -123,6 +126,9 @@ from_el2_to_el1:
     ldp x0, x1, [sp, 16 * 16]
     msr spsr_el1, x0
     msr elr_el1, x1
+    // we need to restore stack pointer in EL0 for Lab5
+    ldr x0, [sp, 16 * 17]
+    msr sp_el0, x0
     // restore x0 and x1(as we just use it to restore the information of spsr and elr)
     ldp x0, x1, [sp ,16 * 0]
     add sp, sp, 32 * 9
@@ -165,6 +171,7 @@ general_irq_handler:
 
 system_call_handler:
   save_all
+  mov x0, sp              // get trap frame(which is the same thing we just saved, meaning that we might modified user space registers)
   bl c_system_call_handler
   load_all
   eret

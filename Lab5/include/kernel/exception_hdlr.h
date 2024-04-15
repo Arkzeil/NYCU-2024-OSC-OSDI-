@@ -7,6 +7,8 @@
 // and other relevant state information, such as the current execution mode (e.g., user mode vs. kernel mode), the CPU privilege level, and any additional CPU-specific state.
 
 // So do I need to store all the general purpose registers?
+// Well, actually we get this trap_frame by using the 'save_all' and 'load_all' in boot.S
+// so the order of it should be the same as in 'save_all' as we'll retain it using sp register
 typedef struct trap_frame{
     unsigned long x0;
     unsigned long x1;
@@ -39,9 +41,9 @@ typedef struct trap_frame{
     unsigned long x28;
     unsigned long fp;           // x29
     unsigned long lr;           // x30
-    unsigned long sp;
-    unsigned long elr_el1;      // the address of the instruction that caused the exception(load it when returning to user program from EL1 to EL0)
     unsigned long spsr_el1;     // origial process state
+    unsigned long elr_el1;      // the address of the instruction that caused the exception(load it when returning to user program from EL1 to EL0)
+    unsigned long sp_el0;       // stack pointer
 }trap_frame_t;
 
 extern int test_NI;

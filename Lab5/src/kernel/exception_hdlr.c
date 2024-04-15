@@ -3,6 +3,7 @@
 #include "kernel/gpio.h"
 #include "kernel/timer.h"
 #include "kernel/task.h"
+#include "kernel/syscall.h"
 // test_NI is for testing nested interrupt
 int test_NI = 0;
 
@@ -18,9 +19,46 @@ void int_on(void){
         "msr daifclr, 0xf;"
     );
 }
+// x0 = tf
+void c_system_call_handler(trap_frame_t *tf){
+    uart_puts("Entering system call handler\n");
+    // based on the lab instruction. The system call numbers given below would be stored in x8
+    unsigned long long syscall_num = tf->x8;
+    //uart_b2x_64(syscall_num);
+    //uart_putc('\n');
+    current_tf = tf;
 
-void c_system_call_handler(){
-    uart_puts("System call\n");
+    switch (syscall_num){
+        case 0:
+            getpid();
+            break;
+        case 1:
+            uart_read((char *)current_tf->x1, current_tf->x2);
+            break;
+        case 2:
+            uart_write((char *)current_tf->x1, current_tf->x2);
+            break;
+        case 3:
+            exec((const char *)current_tf->x1, (char *const *)current_tf->x2);
+            break;
+        case 4:
+            fork();
+            break;
+        case 5:
+            exit();
+            break;
+        case 6:
+            mbox_call((unsigned char)current_tf->x1, (unsigned int *)current_tf->x2);
+            break;
+        case 7:
+            kill((int)current_tf->x1);
+            break;
+        default:
+            uart_puts("Unknown system call number: ");
+            uart_b2x_64(syscall_num);
+            uart_putc('\n');
+            break;
+    }
 }
 
 void c_exception_handler(){
