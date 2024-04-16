@@ -19,13 +19,13 @@ typedef struct thread_context{
     unsigned long x26;
     unsigned long x27;
     unsigned long x28;
-    unsigned long fp;
+    unsigned long fp;   //x29, pointed to the bottom of the stack, which is the value of the stack pointer just before the function was called(should be immutable).
     unsigned long lr;   //x30
     unsigned long sp;
 }thread_context_t;
 
 
-// I considered using list like https://github.com/torvalds/linux/blob/master/include/linux/list.h, but it's actually rely on container_of to get corresponding struct address.
+// I considered using list like https://github.com/torvalds/linux/blob/master/include/linux/list.h, but it's actually rely on 'container_of' to get corresponding struct address.
 // which is quite complex to implement(Another way is to put that list struct in the first element of thread struct so you can get right address using 'next'). 
 // But it's actually not a better solution. So I will use simple linked list instead.
 
@@ -34,7 +34,8 @@ typedef struct thread{
     struct thread *next;
     struct thread *prev;
     thread_context_t context;
-    void *data;
+    char *data;
+    int data_size;
     int status;             // 1 for running, 0 for waiting, -1 for zombie
     int pid;
 }thread_t;

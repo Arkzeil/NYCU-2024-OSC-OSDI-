@@ -35,6 +35,40 @@ void *cpio_find(char *input){
     return 0;
 }
 
+int cpio_get_size(char *input){
+    char *temp_addr = cpio_addr;
+    struct cpio_newc_header* header = (struct cpio_newc_header*)temp_addr;
+
+    int namesize;
+    int filesize;
+
+    while(string_comp((char*)(temp_addr + sizeof(struct cpio_newc_header)), "TRAILER!!!") != 0){
+        header = (struct cpio_newc_header*)temp_addr;
+        namesize = h2i(header->c_namesize, 8);
+        filesize = h2i(header->c_filesize, 8);
+
+        if(!string_comp((char*)(temp_addr + sizeof(struct cpio_newc_header)), input)){
+            //uart_b2x(filesize);
+            //uart_putc('\n');
+            if(filesize == 0){
+                //uart_puts(input);
+                uart_puts("Is a directory\n");
+                return -1;
+            }
+            else{
+                // should I use the size without padding?
+                return filesize;
+            }
+        }
+
+        temp_addr += (sizeof(struct cpio_newc_header) + namesize + filesize + align_offset((sizeof(struct cpio_newc_header) + namesize), 4) + align_offset(filesize, 4));
+    }
+    
+    //uart_puts(input);
+    uart_puts("No such file or directory\n");
+    return -1;
+}
+
 void cpio_ls(){
     // a temp address used for ls function
     char *temp_addr = cpio_addr;

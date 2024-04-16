@@ -38,6 +38,7 @@ struct cpio_newc_header {
 };
 
 void *cpio_find(char *input);
+int cpio_get_size(char *input);
 void cpio_ls();
 void cpio_cat(char *input);
 

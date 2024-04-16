@@ -38,7 +38,10 @@ thread_t* thread_create(void *fn, void *arg){
     new_thread->status = 0; // consider this thread is waiting
     new_thread->sp = (void*)(pool_alloc(THREAD_STK_SIZE));
     // set stack pointer to the end of this process's stack
+    // But won't this corrupt other memory regions? -> Well... it's stack, so it is growing downward, which means it won't corrupt other memory regions.
     new_thread->context.sp = (unsigned long)new_thread->sp + THREAD_STK_SIZE;
+    // set the frame pointer to the value of the stack pointer just before the function was called
+    new_thread->context.fp = new_thread->context.sp;
     // store function in link register, which will be executed after return from 'switch_to' 
     new_thread->context.lr = (unsigned long)fn;
 
