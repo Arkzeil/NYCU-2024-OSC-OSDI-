@@ -11,6 +11,7 @@
 #include "kernel/task.h"
 #include "kernel/INT.h"
 #include "kernel/thread.h"
+#include "kernel/syscall.h"
 
 void my_shell();
 

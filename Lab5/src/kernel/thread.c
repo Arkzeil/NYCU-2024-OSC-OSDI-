@@ -30,7 +30,9 @@ thread_t* thread_create(void *fn, void *arg){
     thread_t *new_thread = (thread_t*)pool_alloc(sizeof(thread_t));
     if(new_thread == 0)
         return 0;
-        
+    
+    memzero(&new_thread->context, sizeof(thread_context_t));
+    
     new_thread->data = arg;
     new_thread->pid = allocated_pid++;
     new_thread->next = 0;
@@ -84,8 +86,14 @@ void schedule(void){
     // make it circular
     else if(cur_thread->next == 0 && run_queue->status != -1)
         cur_thread = run_queue;
-
+    else if(cur_thread->next == 0 && run_queue->status == -1){
+        uart_puts("No thread can be schedule(only idle)\n");
+        return;
+    }
+    
     cur_thread->status = 1; // running
+    uart_puts("Switch to thread: ");
+    uart_itoa(cur_thread->pid);
 
     switch_to(get_current(), &cur_thread->context);
 
@@ -93,9 +101,11 @@ void schedule(void){
 }
 
 void idle_task(void){
-    while(1){
+    static int i = 0;
+    while(i < 1){
         kill_zombies();
         schedule();
+        i++;
     }
 }
 // reclaim threads marked as zombie. In this exercise, all threads are consider the child of idle thread
@@ -104,6 +114,9 @@ void kill_zombies(void){
     while(current != 0){
         if(current->status == -1){
             thread_t *tmp = current;
+            uart_puts("Zombie killed: ");
+            uart_itoa(tmp->pid);
+            uart_putc('\n');
             current = current->next;
             pool_free(tmp->sp);
             pool_free(tmp);
@@ -122,5 +135,72 @@ void foo(void){
         uart_putc('\n');
         delay(1000000);
         schedule();
+    }
+}
+
+void fork_test(void){
+    uart_puts("\nFork Test, pid: ");
+    uart_itoa(getpid());
+    uart_putc('\n');
+
+    int cnt = 1;
+    int ret = 0;
+
+    if ((ret = fork()) == 0) { // child
+        long long cur_sp;
+        asm volatile("mov %0, sp" : "=r"(cur_sp));
+        
+        uart_puts("first child pid: ");
+        uart_itoa(getpid());
+        uart_puts(", cnt: ");
+        uart_itoa(cnt);
+        uart_puts(", ptr: ");
+        uart_b2x_64((unsigned long long)&cnt);
+        uart_puts(", sp : ");
+        uart_b2x_64(cur_sp);
+        uart_putc('\n');
+
+        ++cnt;
+
+        if ((ret = fork()) != 0){
+            asm volatile("mov %0, sp" : "=r"(cur_sp));
+            
+            uart_puts("first child pid: ");
+            uart_itoa(getpid());
+            uart_puts(", cnt: ");
+            uart_itoa(cnt);
+            uart_puts(", ptr: ");
+            uart_b2x_64((unsigned long long)&cnt);
+            uart_puts(", sp : ");
+            uart_b2x_64(cur_sp);
+            uart_putc('\n');
+        }
+        else{
+            while (cnt < 5) {
+                asm volatile("mov %0, sp" : "=r"(cur_sp));
+                
+                uart_puts("second child pid: ");
+                uart_itoa(getpid());
+                uart_puts(", cnt: ");
+                uart_itoa(cnt);
+                uart_puts(", ptr: ");
+                uart_b2x_64((unsigned long long)&cnt);
+                uart_puts(", sp : ");
+                uart_b2x_64(cur_sp);
+                uart_putc('\n');
+
+                delay(1000000);
+                ++cnt;
+            }
+        }
+        exit();
+    }
+    else {
+        uart_puts("parent here, pid ");
+        uart_itoa(getpid());
+        uart_puts(", child ");
+        uart_itoa(ret);
+        uart_putc('\n');
+        exit();
     }
 }

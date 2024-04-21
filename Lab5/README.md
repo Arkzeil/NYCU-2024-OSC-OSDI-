@@ -8,6 +8,8 @@
 ### Basic Exercise 2 - User Process and System Call 
 + Background
 
++ system call -> save_all -> exception handler -> create process -> save trap_frame of the caller process into pt_regs -> scedule ->  -> use switch_to by loading new process 'context' struct to update x19 - x31 and pc -> load_all -> eret -> jump to the new loaded context.lr and use context.sp
+
 ### Basic Exercise 3 - Video Player
 
 ## Advanced Exercises

@@ -5,6 +5,8 @@
 #include "kernel/lock.h"
 #include "kernel/uart.h"
 #include "kernel/utils.h"
+#include "kernel/syscall.h"
+#include "kernel/mem.h"
 
 #define THREAD_STK_SIZE 4096
 // calee saved registers
@@ -20,7 +22,7 @@ typedef struct thread_context{
     unsigned long x27;
     unsigned long x28;
     unsigned long fp;   //x29, pointed to the bottom of the stack, which is the value of the stack pointer just before the function was called(should be immutable).
-    unsigned long lr;   //x30
+    unsigned long lr;   //x30, but it's refered as PC in some implementation
     unsigned long sp;
 }thread_context_t;
 
@@ -30,15 +32,17 @@ typedef struct thread_context{
 // But it's actually not a better solution. So I will use simple linked list instead.
 
 typedef struct thread{
-    void *sp;
+    thread_context_t context;
+    char *sp;               // make it char in order to access it byte by byte during fork
     struct thread *next;
     struct thread *prev;
-    thread_context_t context;
     char *data;
     int data_size;
     int status;             // 1 for running, 0 for waiting, -1 for zombie
     int pid;
 }thread_t;
+
+
 
 extern thread_t *cur_thread;
 extern thread_t *run_queue;
@@ -46,6 +50,8 @@ extern thread_t *wait_queue;
 
 extern void switch_to(void *prev, void *next);
 extern void* get_current();
+extern void fork_return(void);
+extern void to_user(void);
 
 void thread_init(void);
 thread_t* thread_create(void *fn, void *arg);
@@ -56,5 +62,6 @@ void schedule(void);
 
 void idle_task(void);
 void foo(void);
+void fork_test(void);
 
 #endif

@@ -6,6 +6,7 @@
 #include "kernel/thread.h"
 #include "kernel/uart.h"
 #include "kernel/cpio.h"
+#include "kernel/mailbox.h"
 
 extern trap_frame_t *current_tf;
 

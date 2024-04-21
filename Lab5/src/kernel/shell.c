@@ -180,6 +180,41 @@ void my_shell(){
 
             ExecTasks();
         }
+        else if(!string_comp(buf, "mem")){
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(196);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+            pool_alloc(196);
+            pool_alloc(4096);
+        }
         else if(!string_comp(buf, "buddy")){
             buddy_init();
             memory_reserve((void*)0x10003A28, (void*)0x10003A28 + 0x1000);
@@ -243,6 +278,11 @@ void my_shell(){
 
             uart_irq_off();
             test_NI = 0;
+        }
+        else if(!string_comp(buf, "syscall")){
+            thread_init();
+            thread_create(fork_test, 0);
+            idle_task();
         }
         else{
             uart_puts("Unknown Command: ");
