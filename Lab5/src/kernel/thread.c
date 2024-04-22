@@ -27,17 +27,18 @@ thread_t* thread_create(void *fn, void *arg){
     // record the pid that already allocated(no matter that thread is alive or not)
     static int allocated_pid = 0;
 
-    thread_t *new_thread = (thread_t*)pool_alloc(sizeof(thread_t));
+    thread_t *new_thread = (thread_t*)pool_alloc(196);
     if(new_thread == 0)
         return 0;
-    
-    memzero(&new_thread->context, sizeof(thread_context_t));
+    uart_b2x_64(sizeof(thread_context_t));
+    memzero(&new_thread->context, sizeof(struct thread_context));
     
     new_thread->data = arg;
     new_thread->pid = allocated_pid++;
     new_thread->next = 0;
     new_thread->prev = 0;
     new_thread->status = 0; // consider this thread is waiting
+    
     new_thread->sp = (void*)(pool_alloc(THREAD_STK_SIZE));
     // set stack pointer to the end of this process's stack
     // But won't this corrupt other memory regions? -> Well... it's stack, so it is growing downward, which means it won't corrupt other memory regions.
@@ -46,7 +47,7 @@ thread_t* thread_create(void *fn, void *arg){
     new_thread->context.fp = new_thread->context.sp;
     // store function in link register, which will be executed after return from 'switch_to' 
     new_thread->context.lr = (unsigned long)fn;
-
+    
     if(new_thread->sp == 0){
         pool_free(new_thread);
         return 0;
@@ -102,10 +103,10 @@ void schedule(void){
 
 void idle_task(void){
     static int i = 0;
-    while(i < 1){
+    while(1){
         kill_zombies();
         schedule();
-        i++;
+        //i++;
     }
 }
 // reclaim threads marked as zombie. In this exercise, all threads are consider the child of idle thread

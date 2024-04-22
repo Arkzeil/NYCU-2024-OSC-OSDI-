@@ -8,8 +8,8 @@
 #include "kernel/syscall.h"
 
 #define NR_TASKS 64
-#define TASK_RUNNING 0
-#define TASK_WAITING 1
+#define TASK_RUNNING 1
+#define TASK_WAITING 0
 #define TASK_ZOMBIE -1
 #define PF_KTHREAD   2
 
@@ -45,10 +45,18 @@ extern task_struct_t *current_task;
 extern task_struct_t *task[NR_TASKS];
 extern int nr_tasks;
 // this is the task of kernel shell
-#define INIT_TASK { {0,0,0,0,0,0,0,0,0,0,0,0,0}, 0, 0, TASK_RUNNING, 0, PF_KTHREAD}
+#define INIT_TASK { {0,0,0,0,0,0,0,0,0,0,0,0,0}, 0, 0, TASK_RUNNING, -1, PF_KTHREAD}
 
 extern void ret_from_fork(void);
 int copy_process(unsigned long clone_flags, unsigned long fn, unsigned long arg);
 int to_el0(unsigned long fn);
+
+void process_schedule(void);
+void exit_process(void);
+
+void kernel_procsss(void);
+void user_process(void);
+
+void pfoo(void);
 
 #endif

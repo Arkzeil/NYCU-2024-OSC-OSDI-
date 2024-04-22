@@ -284,6 +284,17 @@ void my_shell(){
             thread_create(fork_test, 0);
             idle_task();
         }
+        else if(!string_comp(buf, "process")){
+            uart_b2x_64((unsigned long long)&kernel_procsss);
+            uart_putc('\n');
+            int res = copy_process(PF_KTHREAD, (unsigned long)&kernel_procsss, 0);
+            if(res < 0){
+                uart_puts("Create process failed\n");
+                continue;
+            }
+            while(1)
+                process_schedule();
+        }
         else{
             uart_puts("Unknown Command: ");
             uart_puts(buf);

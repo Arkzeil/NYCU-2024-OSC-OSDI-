@@ -12,6 +12,7 @@
 #include "kernel/INT.h"
 #include "kernel/thread.h"
 #include "kernel/syscall.h"
+#include "kernel/process.h"
 
 void my_shell();
 

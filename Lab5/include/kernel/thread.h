@@ -11,19 +11,19 @@
 #define THREAD_STK_SIZE 4096
 // calee saved registers
 typedef struct thread_context{
-    unsigned long x19;
-    unsigned long x20;
-    unsigned long x21;
-    unsigned long x22;
-    unsigned long x23;
-    unsigned long x24;
-    unsigned long x25;
-    unsigned long x26;
-    unsigned long x27;
-    unsigned long x28;
-    unsigned long fp;   //x29, pointed to the bottom of the stack, which is the value of the stack pointer just before the function was called(should be immutable).
-    unsigned long lr;   //x30, but it's refered as PC in some implementation
-    unsigned long sp;
+    unsigned long long x19;
+    unsigned long long x20;
+    unsigned long long x21;
+    unsigned long long x22;
+    unsigned long long x23;
+    unsigned long long x24;
+    unsigned long long x25;
+    unsigned long long x26;
+    unsigned long long x27;
+    unsigned long long x28;
+    unsigned long long fp;   //x29, pointed to the bottom of the stack, which is the value of the stack pointer just before the function was called(should be immutable).
+    unsigned long long lr;   //x30, but it's refered as PC in some implementation
+    unsigned long long sp;
 }thread_context_t;
 
 
