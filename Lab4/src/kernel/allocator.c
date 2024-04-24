@@ -8,7 +8,7 @@ void *buddy_mem_start = 0;
 int pool_sizes[NUM_POOLS] = {16, 32, 48, 196, 512, 1024};
 // lists for each pool
 void *free_lists[NUM_POOLS][MAX_CHUNKS_PER_POOL];
-// record that page frame belongs to which pool
+// recorded which pools that page frames belongs to
 int pool_page_addr[(1 << (MAX_ORDER - 1))];
 // record the number of free small blocks in each pool
 int free_list_counts[NUM_POOLS];
@@ -28,6 +28,7 @@ void* simple_malloc(unsigned int size){
     // we need to return the head instead of tail of allocated space
     return (allocated - size);
 }
+void gdb_mem(){}
 
 void buddy_init(void){
     int i;
@@ -50,6 +51,7 @@ void buddy_init(void){
         buddy->list_addr[i] = (void*)list;
 
         buddy_block_list_t *cur = list;
+        buddy_block_list_t *last = 0;
 
         for(j = 0; j < block_amount; j++){
             cur->idx = (j * (1 << i));
@@ -58,8 +60,8 @@ void buddy_init(void){
             if(i == MAX_ORDER - 1){
                 cur->val = MAX_ORDER - 1;
             }
-            if(cur != buddy_mem_start){
-                cur->prev = cur - sizeof(buddy_block_list_t);
+            if(cur != buddy->list_addr[0]){
+                cur->prev = last;
                 cur->prev->next = cur;
             }
             else
@@ -70,11 +72,15 @@ void buddy_init(void){
             cur->size = PAGE_SIZE * (1 << i);
             // update the offset of buddy system memory
             alloc_offset += PAGE_SIZE * (1 << i);
+            
+            last = cur;
             // get next block of block list
-            cur += sizeof(buddy_block_list_t);
+            cur++;
         }
+        gdb_mem();
         // goto next block list
-        list += block_amount * sizeof(buddy_block_list_t);
+        // here should not be cur += block_amount * sizeof(buddy_block_list_t), as cur is a pointer to buddy_block_list_t(+1 = +sizeof(struct)), this will lead to block_amount*size*size instead of block_amount*size
+        list += block_amount;
     }
     // In the begining, only the largest block is available
     buddy->first_avail[MAX_ORDER - 1] = 0;
@@ -147,10 +153,10 @@ int get_index(void *addr){
 }
 // get block metadata address by using index
 buddy_block_list_t* get_block(int index){
-    buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[0] + index * sizeof(buddy_block_list_t);
+    buddy_block_list_t *cur = (buddy_block_list_t *)((void*)buddy->list_addr[0] + index * sizeof(buddy_block_list_t));
     buddy_block_list_t *last = cur;
     for(int i = 0; i < MAX_ORDER; i++){
-        cur = (buddy_block_list_t *)buddy->list_addr[i] + (index / (1 << i)) * sizeof(buddy_block_list_t);
+        cur = (buddy_block_list_t *)((void*)buddy->list_addr[i] + (index / (1 << i)) * sizeof(buddy_block_list_t));
         // this block index is not legal in this level, indicate that it must belonged to lower levels
         if(index % (1 << i) != 0)
             return last;
@@ -170,7 +176,7 @@ buddy_block_list_t* buddy_split(int start_index, int end_index, int req_size, in
     // if the current block is already the smallest block that can be allocated or smaller block is not enough for the request
     if((PAGE_SIZE * (1 << order) / 2) < req_size || order == 0){
         //buddy->first_avail[order] = get_next_avail(order);
-        buddy_block_list_t *start = (buddy_block_list_t *)buddy->list_addr[order] + (start_index / (1 << order)) * sizeof(buddy_block_list_t);
+        buddy_block_list_t *start = (buddy_block_list_t *)((void*)buddy->list_addr[order] + (start_index / (1 << order)) * sizeof(buddy_block_list_t));
         // mark it as allocated
         start->val = -1;
         return start;
@@ -178,7 +184,7 @@ buddy_block_list_t* buddy_split(int start_index, int end_index, int req_size, in
     // split the block until the smallest block that can be allocated
     for(i = order - 1; i >= 0; i--){
         int j = start_index;
-        buddy_block_list_t *start = (buddy_block_list_t *)buddy->list_addr[i] + (start_index / (1 << i)) * sizeof(buddy_block_list_t);
+        buddy_block_list_t *start = (buddy_block_list_t *)((void*)buddy->list_addr[i] + (start_index / (1 << i)) * sizeof(buddy_block_list_t));
         buddy_block_list_t *cur = (buddy_block_list_t *)start;
 
         for(; j < start_index + end_index && cur != 0; j += (1 << i)){
@@ -224,7 +230,7 @@ void mark_allocated(buddy_block_list_t* start){
     int end_index = start->idx + (1 << order);
     for(i = order - 1; i >= 0; i--){
         int j = start->idx;
-        buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[i] + (start->idx / (1 << i)) * sizeof(buddy_block_list_t);
+        buddy_block_list_t *cur = (buddy_block_list_t *)((void*)buddy->list_addr[i] + (start->idx / (1 << i)) * sizeof(buddy_block_list_t));
         for(; j < end_index && cur != 0; j += (1 << i)){
             if(cur->val == -2)
                 cur->val = -1;
@@ -238,7 +244,7 @@ void free_child(int block_index, int order){
 
     for(i = order - 1; i >= 0; i--){
         int j;
-        buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[i] + (block_index / (1 << i)) * sizeof(buddy_block_list_t);
+        buddy_block_list_t *cur = (buddy_block_list_t *)((void*)buddy->list_addr[i] + (block_index / (1 << i)) * sizeof(buddy_block_list_t));
         for(j = 0; j < (1 << order); j += (1 << i)){
             cur->val = -2;
             cur = cur->next;
@@ -262,7 +268,7 @@ void* buddy_malloc(unsigned int size){
     for(i = 0; i < MAX_ORDER; i++){
         if(PAGE_SIZE * (1 << i) >= size){
             if(buddy->first_avail[i] >= 0){
-                buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[i] + (buddy->first_avail[i] / (1 << i)) * sizeof(buddy_block_list_t);
+                buddy_block_list_t *cur = (buddy_block_list_t *)((void*)buddy->list_addr[i] + (buddy->first_avail[i] / (1 << i)) * sizeof(buddy_block_list_t));
                 //buddy_block_list_t *cur = (buddy_block_list_t *)buddy->first_avail[i];
                 // meaning that the mechanism went wrong, this condition should not be met
                 if(cur->val < 0){
@@ -309,7 +315,7 @@ void buddy_free(void *addr){
     buddy_block_list_t *cur_block = get_block(block_index);
     int order = simple_log(cur_block->size / PAGE_SIZE, 2);
     int buddy_index = find_buddy(block_index, order);
-    buddy_block_list_t *buddy_block = (buddy_block_list_t *)buddy->list_addr[order] + (buddy_index / (1 << order)) * sizeof(buddy_block_list_t);
+    buddy_block_list_t *buddy_block = (buddy_block_list_t *)((void*)buddy->list_addr[order] + (buddy_index / (1 << order)) * sizeof(buddy_block_list_t));
     /*uart_itoa(cur_block->size);
     uart_putc(' ');
     uart_itoa(block_index);
@@ -336,8 +342,8 @@ void buddy_free(void *addr){
         // To prevet the case that block index is not a block in larger block level
         //block_index = find_min(block_index, buddy_index);
         buddy_index = find_buddy(block_index, i);
-        cur_block = (buddy_block_list_t *)buddy->list_addr[i] + (block_index / (1 << i)) * sizeof(buddy_block_list_t);
-        buddy_block = (buddy_block_list_t *)buddy->list_addr[i] + (buddy_index / (1 << i)) * sizeof(buddy_block_list_t);
+        cur_block = (buddy_block_list_t *)((void*)buddy->list_addr[i] + (block_index / (1 << i)) * sizeof(buddy_block_list_t));
+        buddy_block = (buddy_block_list_t *)((void*)buddy->list_addr[i] + (buddy_index / (1 << i)) * sizeof(buddy_block_list_t));
 
         // reaching largest block, no need to merge
         if(i == MAX_ORDER - 1){
@@ -374,14 +380,6 @@ void buddy_free(void *addr){
     //show_buddy_system_stat();
 }
 
-void* mymalloc(unsigned int size){
-    if(size < PAGE_SIZE){
-        return simple_malloc(size);
-    }
-    else
-        return buddy_malloc(size);
-}
-
 void pool_init() {
     int i;
     for(i = 0; i < NUM_POOLS; i++){
@@ -401,7 +399,7 @@ void *pool_alloc(unsigned int size) {
 
     // Exceed pool size, give it a whole page frame
     if(pool_idx == NUM_POOLS)
-        return buddy_malloc(4096);
+        return buddy_malloc(size);
 
     if(free_list_counts[pool_idx] <= 0) {
         // Allocate a new page frame from the buddy system
@@ -475,6 +473,11 @@ void memory_reserve(void* start,void* end){
     int end_index = get_index(end);
     int i;
 
+    if(end_index < start_index){
+        uart_puts("Error: The end address is smaller than the start address\n");
+        return;
+    }
+
     uart_puts("Reserve memory from:");
     uart_b2x_64((unsigned long long)start);
     uart_puts(" to:");
@@ -490,8 +493,8 @@ void memory_reserve(void* start,void* end){
     for(i = 0; i < MAX_ORDER; i++){
         int j = start_index;
         do{
-            buddy_block_list_t *cur = (buddy_block_list_t *)buddy->list_addr[i] + (j / (1 << i)) * sizeof(buddy_block_list_t);
-            buddy_block_list_t *buddy_block = (buddy_block_list_t *)buddy->list_addr[i] + (find_buddy(j, i) / (1 << i)) * sizeof(buddy_block_list_t);
+            buddy_block_list_t *cur = (buddy_block_list_t *)((void*)buddy->list_addr[i] + (j / (1 << i)) * sizeof(buddy_block_list_t));
+            buddy_block_list_t *buddy_block = (buddy_block_list_t *)((void*)buddy->list_addr[i] + (find_buddy(j, i) / (1 << i)) * sizeof(buddy_block_list_t));
             if(cur->val == -1){
                 uart_puts("Warning: The block is already allocated(reserved) in:");
                 uart_b2x_64((unsigned long long)cur->addr);
@@ -537,6 +540,6 @@ void startup_init(void){
     memory_reserve((void*)_dtb_addr, (void*)_dtb_addr + 0x30000);
     show_mem_stat();
     // reserve allocator metadata in the physical memory
-    memory_reserve((void*)BUDDY_METADATA_ADDR, (void*)BUDDY_METADATA_ADDR + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));
+    memory_reserve((void*)BUDDY_METADATA_ADDR, (void*)BUDDY_METADATA_ADDR + sizeof(buddy_system_t) + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));
     show_mem_stat();
 }

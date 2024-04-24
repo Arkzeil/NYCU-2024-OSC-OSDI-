@@ -6,7 +6,7 @@ void initramfs_callback(char *struct_addr, char *string_addr, unsigned int prop_
         temp += 4;
         //uart_puts("callback function test--------------\n");
         if(prop_len > 0){
-            uart_puts("CPIO address:");
+            uart_puts("CPIO address start:");
             // Since address are 64bits, if we declare int32, there will be warning
             uint64_t addr = (uint64_t)BE2LE(*(uint32_t*)(temp));
             uart_b2x(addr);
@@ -16,6 +16,20 @@ void initramfs_callback(char *struct_addr, char *string_addr, unsigned int prop_
         }
     }
     //uart_b2x((unsigned int)cpio_addr);
+    if(string_comp(string_addr, "linux,initrd-end") == 0){
+        char *temp = struct_addr;
+        temp += 4;
+        //uart_puts("callback function test--------------\n");
+        if(prop_len > 0){
+            uart_puts("CPIO address end:");
+            // Since address are 64bits, if we declare int32, there will be warning
+            uint64_t addr = (uint64_t)BE2LE(*(uint32_t*)(temp));
+            uart_b2x(addr);
+            uart_putc('\n');
+
+            cpio_end = (char*)addr;
+        }
+    }
 }
 
 void fdt_traverse(void (*callback)(char *, char *, unsigned int)){

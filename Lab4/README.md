@@ -2,6 +2,8 @@
 [class webpage](https://nycu-caslab.github.io/OSC2024/labs/lab4.html)
 ---
 ## Basic Exercises
+** Remember that ```(struct*)cur++``` is to add the ```sizeof(struct)```, so if you wanna directly manipulate the address you must cast it to something like ```void*```**
+** Don't do something like ```cur += amount * sizeof(struct)```, which will lead to a square of memory space consumption ** 
 ### Basic Exercise 1 - Buddy System
 + background
 + In this part, all metadata and available memory are stired in 0x10000000~0x20000000. As for the ```val``` of each block metadata, -3 indicates that it's divided into smaller blocks, -2 indicate that it belongs to a larger contiguous memory block, and -1 indicates that is already allocated

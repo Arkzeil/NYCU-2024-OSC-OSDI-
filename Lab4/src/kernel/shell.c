@@ -180,18 +180,23 @@ void my_shell(){
             ExecTasks();
         }
         else if(!string_comp(buf, "buddy")){
-            buddy_init();
-            memory_reserve((void*)0x10003A28, (void*)0x10003A28 + 0x1000);
+            //buddy_init();
+            //memory_reserve((void*)0x10003A28, (void*)0x10003A28 + 0x1000);
             uart_puts("-----------------\n");
             void *a1 = buddy_malloc(4096);
+            show_mem_stat();
             uart_puts("-----------------\n");
             void *a12 = buddy_malloc(4096);
+            show_mem_stat();
             uart_puts("-----------------\n");
             void *a13 = buddy_malloc(4096);
+            show_mem_stat();
             uart_puts("-----------------\n");
             void *a8 = buddy_malloc(8192);
+            show_mem_stat();
             uart_puts("-----------------\n");
             void *a82 = buddy_malloc(8193);
+            show_mem_stat();
             uart_puts("-----------------\n");
             uart_puts("start free\n");
             buddy_free(a82);
@@ -203,6 +208,7 @@ void my_shell(){
             buddy_free(a13);
             uart_puts("-----------------\n");
             buddy_free(a8);
+            show_mem_stat();
             uart_puts("End free");
             uart_puts("-----------------\n");
             pool_alloc(16);

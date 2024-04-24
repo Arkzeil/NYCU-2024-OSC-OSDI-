@@ -38,22 +38,26 @@ typedef struct buddy_block_list{
 
 /*buddy->2d array with blocks metadata->usable memory*/
 
-typedef struct buddy_block_list{
+struct buddy_block_list{
     unsigned int idx;           // the index of the block(used minimum size block as unit, so the index is the index of the block in the whole memory block)
     int val;                    // the order of the block,-3 indicates that it's divided into smaller blocks, -2 indicate that it belongs to a larger contiguous memory block, -1 indicates that is already allocated
     struct buddy_block_list *prev;   // the previous block
     struct buddy_block_list *next;   // the next block
     int size;                   // the size of the block 
     void *addr;                 // the address of the memory block
-} buddy_block_list_t;
+} __attribute__((__packed__));
+
+typedef struct buddy_block_list buddy_block_list_t;
 
 // a buddy system for memory allocation
-typedef struct buddy_system{
+struct buddy_system{
     //buddy_block_list_t *buddy_list;  // store the list of free blocks of different sizes
     buddy_block_list_t **buddy_list;
     int first_avail[MAX_ORDER];         // the index of the first available block metadata
     void* list_addr[MAX_ORDER];        // record where list starts(actually is uunecssary(as it can be calculated by adding blocks' size), just for convenience)
-}buddy_system_t;
+} __attribute__((__packed__));
+
+typedef struct buddy_system buddy_system_t;
 
 extern buddy_system_t *buddy;
 
