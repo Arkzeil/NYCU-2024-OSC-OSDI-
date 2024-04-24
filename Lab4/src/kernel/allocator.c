@@ -102,7 +102,7 @@ void show_mem_stat(void){
         for(j = 0; j < block_amount; j++){
             if(cur->val >= 0){
                 avails++;
-                uart_itoa(j);
+                uart_itoa(j * (1 << i));
                 uart_putc(' ');
                 avail_pages += (1 << i);
             }
@@ -453,8 +453,10 @@ void pool_free(void *ptr){
         pool_idx = pool_page_addr[offset / PAGE_SIZE];
     }
 
-    if(pool_idx == -1)
-        return; // Invalid pointer
+    if(pool_idx == -1){
+        buddy_free(ptr);
+        return; // Invalid pointer or it's a whole page
+    }
 
     uart_puts("Freed memory pool with index: ");
     uart_itoa(free_list_counts[pool_idx]);
@@ -522,6 +524,7 @@ void memory_reserve(void* start,void* end){
 
 void startup_init(void){
     buddy_init();
+    pool_init();
     show_mem_stat();
     //memory_reserve((void*)0x10000000, (void*)buddy->list_addr[MAX_ORDER - 1] + sizeof(buddy_block_list_t));
     //show_mem_stat();
