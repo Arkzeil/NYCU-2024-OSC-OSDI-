@@ -13,6 +13,9 @@ int pool_page_addr[(1 << (MAX_ORDER - 1))];
 // record the number of free small blocks in each pool
 int free_list_counts[NUM_POOLS];
 
+void mark_allocated(buddy_block_list_t* start);
+int get_next_avail(int order);
+
 void* simple_malloc(unsigned int size){
     // 64bits=8bytes
     size += align_offset(size, 8);
@@ -29,6 +32,99 @@ void* simple_malloc(unsigned int size){
     return (allocated - size);
 }
 void gdb_mem(){}
+
+void buddy_startup_init(void){
+    int i;
+    buddy = (buddy_system_t*)BUDDY_METADATA_ADDR;
+    buddy->buddy_list = (buddy_block_list_t**)(BUDDY_METADATA_ADDR + sizeof(buddy_system_t));
+    // 245760
+    unsigned long total_block = (BUDDY_END - BUDDY_START) / PAGE_SIZE;
+    //buddy_block_list_t buddy_list[MAX_ORDER];
+    // the location where available memory starts(after all metadata)
+    //buddy_mem_start = (void*)(BUDDY_START + sizeof(buddy_system_t) + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));
+    buddy_mem_start = (void*)(BUDDY_START);
+    // the head of current size blocks
+    buddy_block_list_t *list = (buddy_block_list_t *)(buddy->buddy_list);
+
+    for(i = 0; i < MAX_ORDER; i++){
+        int j = 0;
+        int alloc_offset = 0;
+        int block_amount = (1 << (MAX_ORDER - i - 1));
+        
+        buddy->first_avail[i] = -1;
+        buddy->list_addr[i] = (void*)list;
+
+        buddy_block_list_t *cur = list;
+        buddy_block_list_t *last = 0;
+
+        for(j = 0; j < block_amount; j++){
+            cur->idx = (j * (1 << i));
+            // first, all block except largest one are belonged to the largest continuous memory block
+            cur->val = -2;
+            if(i == MAX_ORDER - 1){
+                cur->val = MAX_ORDER - 1;
+            }
+            if(cur != buddy->list_addr[0]){
+                cur->prev = last;
+                cur->prev->next = cur;
+            }
+            else
+                cur->prev = 0;
+            cur->next = 0;
+            // the address of the memory of corresponding block
+            cur->addr = buddy_mem_start + alloc_offset;
+            cur->size = PAGE_SIZE * (1 << i);
+            // update the offset of buddy system memory
+            alloc_offset += PAGE_SIZE * (1 << i);
+            
+            last = cur;
+            // get next block of block list
+            cur++;
+        }
+        // goto next block list
+        // here should not be cur += block_amount * sizeof(buddy_block_list_t), as cur is a pointer to buddy_block_list_t(+1 = +sizeof(struct)), this will lead to block_amount*size*size instead of block_amount*size
+        list += block_amount;
+    }
+    // In the begining, only the largest block is available
+    buddy->first_avail[MAX_ORDER - 1] = 0;
+
+    int cur_index = 0;
+    unsigned long remain_block = total_block;
+    // 0x0 - 0x3c000000
+    for(i = MAX_ORDER - 1; i >= 0; i--){
+        int j;
+        buddy_block_list_t *list_cur = (buddy_block_list_t *)((void*)buddy->list_addr[i] + (cur_index / (1 << i) * sizeof(buddy_block_list_t)));
+
+        for(j = cur_index; j < total_block; j+= (1 << i)){
+            // if the block is larger than the total block
+            if(list_cur->size > remain_block * PAGE_SIZE)
+                list_cur->val = -3;
+            else{
+                uart_itoa(i);
+                uart_putc(' ');
+                uart_b2x_64((unsigned long long)remain_block);
+                uart_putc('\n');
+                //uart_getc();
+                gdb_mem();
+                remain_block -= (list_cur->size / PAGE_SIZE);
+                list_cur->val = i;
+                cur_index = list_cur->next->idx;
+            }
+            
+            list_cur = list_cur->next;
+
+            if(remain_block <= 0){
+                mark_allocated(list_cur);
+                break;
+            }
+        }
+
+        if(remain_block <= 0)
+            break;
+    }
+    for(i = 0; i < MAX_ORDER; i++)
+        buddy->first_avail[i] = get_next_avail(i);
+}
 
 void buddy_init(void){
     int i;
@@ -501,6 +597,7 @@ void memory_reserve(void* start,void* end){
                 uart_puts("Warning: The block is already allocated(reserved) in:");
                 uart_b2x_64((unsigned long long)cur->addr);
                 uart_putc('\n');
+                uart_getc();
                 //return;
             }
 
@@ -523,25 +620,35 @@ void memory_reserve(void* start,void* end){
 }
 
 void startup_init(void){
-    buddy_init();
+    uart_puts("Buddy System init starting\n");
+    //buddy_init();
+    buddy_startup_init();
+    uart_puts("Pool init starting\n");
     pool_init();
+    uart_puts("Startup init starting\n");
     show_mem_stat();
     //memory_reserve((void*)0x10000000, (void*)buddy->list_addr[MAX_ORDER - 1] + sizeof(buddy_block_list_t));
     //show_mem_stat();
-    // reserve Spin tables for multicore boot 
+    // reserve Spin tables for multicore boot
+    uart_getc(); 
     memory_reserve((void*)0x0, (void*)0x1000);
     show_mem_stat();
+    uart_getc();
     memory_reserve((void*)0x1000, (void*)0x80000);
     show_mem_stat();
+    uart_getc();
     // reserve Kernel image in the physical memory
     memory_reserve((void*)&_start, (void*)&__end);
     show_mem_stat();
+    uart_getc();
     // reserve the CPIO archive in the physical memory
     memory_reserve((void*)cpio_addr, (void*)cpio_addr + 0x100000);
     show_mem_stat();
+    uart_getc();
     // reserve the device tree blob in the physical memory
     memory_reserve((void*)_dtb_addr, (void*)_dtb_addr + 0x30000);
     show_mem_stat();
+    uart_getc();
     // reserve allocator metadata in the physical memory
     memory_reserve((void*)BUDDY_METADATA_ADDR, (void*)BUDDY_METADATA_ADDR + sizeof(buddy_system_t) + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));
     show_mem_stat();

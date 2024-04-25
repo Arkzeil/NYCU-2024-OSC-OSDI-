@@ -10,7 +10,7 @@
 #define PAGE_SIZE           4096
 #define BUDDY_START         0x0
 #define BUDDY_END           0x3C000000
-#define MAX_ORDER           18          // 2^17 ~= 128KB page frames = 512MB
+#define MAX_ORDER           19          // 0x3c000000/0x1000 = 0x3c000 = 245760 = 2^17 + 2^16 + 2^15 + 2^14, so the maximum order is 18(0~18)
 #define BUDDY_METADATA_ADDR 0x10000000
 // the number of memory pools
 #define NUM_POOLS   6
@@ -45,7 +45,7 @@ struct buddy_block_list{
     struct buddy_block_list *next;   // the next block
     int size;                   // the size of the block 
     void *addr;                 // the address of the memory block
-} __attribute__((__packed__));
+};
 
 typedef struct buddy_block_list buddy_block_list_t;
 
@@ -55,7 +55,7 @@ struct buddy_system{
     buddy_block_list_t **buddy_list;
     int first_avail[MAX_ORDER];         // the index of the first available block metadata
     void* list_addr[MAX_ORDER];        // record where list starts(actually is uunecssary(as it can be calculated by adding blocks' size), just for convenience)
-} __attribute__((__packed__));
+};
 
 typedef struct buddy_system buddy_system_t;
 

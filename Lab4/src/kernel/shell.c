@@ -131,8 +131,8 @@ void my_shell(){
         else if(!string_comp(buf, "async")){
             char async_buf[MAX_BUF_LEN];
             int ticks = 150;
-
-            uart_irq_on();
+            int_on();
+            uart_irq_on();  
 
             uart_irq_puts("Async I/O test:");
             uart_irq_gets(async_buf);
@@ -179,6 +179,26 @@ void my_shell(){
 
             ExecTasks();
         }
+        else if(!string_comp(buf, "test")){
+            test_NI = h2i(argv[0], string_len(argv[0]));
+
+            uart_itoa(test_NI);
+            uart_putc('\n');
+
+            uart_irq_on();
+            delay(1000);
+            uart_puts("Press a key to test nested interrupt\n");
+            
+            PRI_TEST_FLAG = 0;
+            while(PRI_TEST_FLAG == 0){
+                if(PRI_TEST_FLAG == 1)
+                    break;
+            }
+            delay(1000);
+
+            uart_irq_off();
+            test_NI = 0;
+        }
         else if(!string_comp(buf, "buddy")){
             //buddy_init();
             //memory_reserve((void*)0x10003A28, (void*)0x10003A28 + 0x1000);
@@ -186,18 +206,23 @@ void my_shell(){
             void *a1 = buddy_malloc(4096);
             show_mem_stat();
             uart_puts("-----------------\n");
+            uart_getc();
             void *a12 = buddy_malloc(4096);
             show_mem_stat();
             uart_puts("-----------------\n");
+            uart_getc();
             void *a13 = buddy_malloc(4096);
             show_mem_stat();
             uart_puts("-----------------\n");
+            uart_getc();
             void *a8 = buddy_malloc(8192);
             show_mem_stat();
             uart_puts("-----------------\n");
+            uart_getc();
             void *a82 = buddy_malloc(8193);
             show_mem_stat();
             uart_puts("-----------------\n");
+            uart_getc();
             uart_puts("start free\n");
             buddy_free(a82);
             uart_puts("-----------------\n");
@@ -209,11 +234,14 @@ void my_shell(){
             uart_puts("-----------------\n");
             buddy_free(a8);
             show_mem_stat();
+            uart_getc();
             uart_puts("End free");
             uart_puts("-----------------\n");
             pool_alloc(16);
             uart_puts("-----------------\n");
             pool_alloc(16);
+            uart_puts("-----------------\n");
+            pool_alloc(48);
             uart_puts("-----------------\n");
             pool_free(pool_alloc(10));
             uart_puts("-----------------\n");
