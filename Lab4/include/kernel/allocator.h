@@ -6,7 +6,7 @@
 #include "kernel/dtb.h"
 #include "kernel/cpio.h"
 
-#define MAX_HEAP_SIZE       8192
+#define MAX_HEAP_SIZE       4194304
 #define PAGE_SIZE           4096
 #define BUDDY_START         0x0
 #define BUDDY_END           0x3C000000
@@ -21,7 +21,7 @@ extern char* __end;
 extern char* _start;
 // make allocated variable global among all files
 extern char* allocated;
-extern int offset;
+extern int heap_offset;
 
 /*typedef struct buddy_block{
     unsigned int idx;           // the index of the block

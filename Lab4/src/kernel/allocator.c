@@ -1,17 +1,17 @@
 #include "kernel/allocator.h"
 // get the heap address
 char *allocated = (char*)&__end;
-int offset = 0;
+int heap_offset = 0;
 buddy_system_t *buddy = 0;
 void *buddy_mem_start = 0;
 
 int pool_sizes[NUM_POOLS] = {16, 32, 48, 196, 512, 1024};
 // lists for each pool
-void *free_lists[NUM_POOLS][MAX_CHUNKS_PER_POOL];
+void ***free_lists;
 // recorded which pools that page frames belongs to
-int pool_page_addr[(1 << (MAX_ORDER - 1))];
+int *pool_page_addr;
 // record the number of free small blocks in each pool
-int free_list_counts[NUM_POOLS];
+int *free_list_counts;
 
 void mark_allocated(buddy_block_list_t* start);
 int get_next_avail(int order);
@@ -20,13 +20,13 @@ void* simple_malloc(unsigned int size){
     // 64bits=8bytes
     size += align_offset(size, 8);
 
-    if(offset + size > MAX_HEAP_SIZE)
+    if(heap_offset + size > MAX_HEAP_SIZE)
         return 0;
 
     // allocate space
     allocated += size;
     // record accumulated allocated space
-    offset += size;
+    heap_offset += size;
 
     // we need to return the head instead of tail of allocated space
     return (allocated - size);
@@ -100,12 +100,6 @@ void buddy_startup_init(void){
             if(list_cur->size > remain_block * PAGE_SIZE)
                 list_cur->val = -3;
             else{
-                uart_itoa(i);
-                uart_putc(' ');
-                uart_b2x_64((unsigned long long)remain_block);
-                uart_putc('\n');
-                //uart_getc();
-                gdb_mem();
                 remain_block -= (list_cur->size / PAGE_SIZE);
                 list_cur->val = i;
                 cur_index = list_cur->next->idx;
@@ -478,6 +472,19 @@ void buddy_free(void *addr){
 
 void pool_init() {
     int i;
+    free_lists = simple_malloc(sizeof(void *) * NUM_POOLS * MAX_CHUNKS_PER_POOL);
+    for(i = 0; i < NUM_POOLS; i++){
+        free_lists[i] = (void**)simple_malloc(sizeof(void *) * MAX_CHUNKS_PER_POOL);
+    }
+    gdb_mem();
+    pool_page_addr = simple_malloc(sizeof(int) * (1 << (MAX_ORDER - 1)));
+    free_list_counts = simple_malloc(sizeof(int) * NUM_POOLS);
+
+    if(free_lists == 0 || pool_page_addr == 0 || free_list_counts == 0){
+        uart_puts("Error:Simple memory allocation failed\n");
+        return;
+    }
+    
     for(i = 0; i < NUM_POOLS; i++){
         free_list_counts[i] = 0;
     }
@@ -651,5 +658,9 @@ void startup_init(void){
     uart_getc();
     // reserve allocator metadata in the physical memory
     memory_reserve((void*)BUDDY_METADATA_ADDR, (void*)BUDDY_METADATA_ADDR + sizeof(buddy_system_t) + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));
+    show_mem_stat();
+    uart_getc();
+    // reserve the pool metadata in the physical memory
+    memory_reserve((void*)&__end, (void*)allocated);
     show_mem_stat();
 }
