@@ -1,3 +1,9 @@
+.global call_get_pid
+call_get_pid:
+    mov w8, #0	
+    svc #0
+    ret
+
 .global call_uart_read
 call_uart_read:
     mov w8, #1	

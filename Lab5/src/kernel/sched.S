@@ -46,14 +46,12 @@ get_current:
     ldp x24, x25, [sp ,16 * 12]
     ldp x26, x27, [sp ,16 * 13]
     ldp x28, x29, [sp ,16 * 14]
-    ldr x30, [sp, 16 * 15]
+    ldp x30, x0, [sp, 16 * 15]
+    msr spsr_el1, x0
     // load information when interrupted task return(used when nested interrupt occurs)
     ldp x0, x1, [sp, 16 * 16]
-    msr spsr_el1, x0
-    msr elr_el1, x1
-    // we need to restore stack pointer in EL0 for Lab5
-    ldr x0, [sp, 16 * 17]
-    msr sp_el0, x0
+    msr elr_el1, x0
+    msr sp_el0, x1
     // restore x0 and x1(as we just use it to restore the information of spsr and elr)
     ldp x0, x1, [sp ,16 * 0]
     add sp, sp, 32 * 9
@@ -66,4 +64,4 @@ ret_from_fork:
     blr x19
 1:
     load_all
-    ret
+    eret

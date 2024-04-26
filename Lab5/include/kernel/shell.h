@@ -13,6 +13,7 @@
 #include "kernel/thread.h"
 #include "kernel/syscall.h"
 #include "kernel/process.h"
+#include "kernel/type.h"
 
 void my_shell();
 

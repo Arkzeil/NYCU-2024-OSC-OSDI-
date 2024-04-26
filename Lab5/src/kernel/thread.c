@@ -27,7 +27,7 @@ thread_t* thread_create(void *fn, void *arg){
     // record the pid that already allocated(no matter that thread is alive or not)
     static int allocated_pid = 0;
 
-    thread_t *new_thread = (thread_t*)pool_alloc(196);
+    thread_t *new_thread = (thread_t*)pool_alloc(2048);
     if(new_thread == 0)
         return 0;
     uart_b2x_64(sizeof(thread_context_t));
@@ -103,10 +103,10 @@ void schedule(void){
 
 void idle_task(void){
     static int i = 0;
-    while(1){
+    while(i < 6){
         kill_zombies();
         schedule();
-        //i++;
+        i++;
     }
 }
 // reclaim threads marked as zombie. In this exercise, all threads are consider the child of idle thread

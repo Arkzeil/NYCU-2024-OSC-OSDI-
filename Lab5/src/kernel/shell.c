@@ -216,8 +216,8 @@ void my_shell(){
             pool_alloc(4096);
         }
         else if(!string_comp(buf, "buddy")){
-            buddy_init();
-            memory_reserve((void*)0x10003A28, (void*)0x10003A28 + 0x1000);
+            //buddy_init();
+            //memory_reserve((void*)0x10003A28, (void*)0x10003A28 + 0x1000);
             uart_puts("-----------------\n");
             void *a1 = buddy_malloc(4096);
             uart_puts("-----------------\n");
@@ -285,14 +285,20 @@ void my_shell(){
             idle_task();
         }
         else if(!string_comp(buf, "process")){
-            uart_b2x_64((unsigned long long)&kernel_procsss);
+            //uart_itoa(sizeof(buddy_block_list_t));
+            //uart_putc('\n');
+            uart_b2x_64((my_uint64_t)&idle_process);
             uart_putc('\n');
-            int res = copy_process(PF_KTHREAD, (unsigned long)&kernel_procsss, 0);
-            if(res < 0){
+            uart_b2x_64((my_uint64_t)&kernel_procsss);
+            uart_putc('\n');
+            int res = copy_process(PF_KTHREAD, (my_uint64_t)&idle_process, 0, 0);
+            int res2 = copy_process(PF_KTHREAD, (my_uint64_t)&kernel_procsss, 0, 0);
+            if(res < 0 || res2 < 0){
                 uart_puts("Create process failed\n");
                 continue;
             }
-            while(1)
+            //idle_process();
+            //while(1)
                 process_schedule();
         }
         else{

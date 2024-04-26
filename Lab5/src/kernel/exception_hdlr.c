@@ -27,6 +27,8 @@ void c_system_call_handler(trap_frame_t *tf){
     //uart_b2x_64(syscall_num);
     //uart_putc('\n');
     current_tf = tf;
+    uart_b2x_64((unsigned long long)syscall_num);
+    uart_putc('\n');
 
     switch (syscall_num){
         case 0:
@@ -59,6 +61,9 @@ void c_system_call_handler(trap_frame_t *tf){
             uart_putc('\n');
             break;
     }
+
+    // while(1)
+    //     asm volatile("nop");
 }
 
 void c_exception_handler(){
@@ -94,10 +99,10 @@ void c_exception_handler(){
     uart_putc('\n');
 
     uart_puts("Leaving exception handler\n");
-    // It will keep printing as next line of boot.S is 'b exception_handler'
-    /*while(1){
+    
+    while(1){
         asm volatile("nop");
-    }*/
+    }
 }
 
 void c_core_timer_handler(){

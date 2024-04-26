@@ -76,7 +76,7 @@ from_el2_to_el1:
 
 // save general registers to stack
 .macro save_all
-    sub sp, sp, 32 * 9
+    sub sp, sp, 32 * 8
     stp x0, x1, [sp ,16 * 0]
     stp x2, x3, [sp ,16 * 1]
     stp x4, x5, [sp ,16 * 2]
@@ -92,16 +92,17 @@ from_el2_to_el1:
     stp x24, x25, [sp ,16 * 12]
     stp x26, x27, [sp ,16 * 13]
     stp x28, x29, [sp ,16 * 14]
-    str x30, [sp, 16 * 15]
     // save information of interrupted task(used when nested interrupt occurs)
     mrs x0, spsr_el1
-    mrs x1, elr_el1
-    stp x0, x1, [sp, 16 * 16]
+    stp x30, x0, [sp, 16 * 15]
+    mrs x0, elr_el1
     // we need to store stack pointer in EL0 for Lab5
-    mrs x0, sp_el0
-    str x0, [sp, 16 * 17]
+    mrs x1, sp_el0
+    stp x0, x1, [sp, 16 * 16]
+    
     // restore x0 and x1(as we just use it to save the information of spsr and elr)
     ldp x0, x1, [sp, 16 * 0] 
+
 .endm
 
 // load general registers from stack
@@ -121,17 +122,15 @@ from_el2_to_el1:
     ldp x24, x25, [sp ,16 * 12]
     ldp x26, x27, [sp ,16 * 13]
     ldp x28, x29, [sp ,16 * 14]
-    ldr x30, [sp, 16 * 15]
+    ldp x30, x0, [sp, 16 * 15]
+    msr spsr_el1, x0
     // load information when interrupted task return(used when nested interrupt occurs)
     ldp x0, x1, [sp, 16 * 16]
-    msr spsr_el1, x0
-    msr elr_el1, x1
-    // we need to restore stack pointer in EL0 for Lab5
-    ldr x0, [sp, 16 * 17]
-    msr sp_el0, x0
+    msr elr_el1, x0
+    msr sp_el0, x1
     // restore x0 and x1(as we just use it to restore the information of spsr and elr)
     ldp x0, x1, [sp ,16 * 0]
-    add sp, sp, 32 * 9
+    add sp, sp, 32 * 8
 .endm
 
 exception_handler:

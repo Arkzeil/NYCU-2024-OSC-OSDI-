@@ -3,8 +3,9 @@
 trap_frame_t *current_tf;
 
 int getpid(){
-    current_tf->x0 = cur_thread->pid; 
-    return cur_thread->pid;
+    uart_puts("getpid\n");
+    current_tf->x0 = current_task->pid; 
+    return current_task->pid;
 }
 
 unsigned int uart_read(char buf[], unsigned int size){
