@@ -37,17 +37,17 @@ typedef struct task_struct{
     // this is used for saving the context of the process when it's scheduled out
     process_context_t context;
     my_uint64_t sp;
-    trap_frame_t *tf;
     int status;
     int pid;
     int flag;
+    trap_frame_t *tf;
 }task_struct_t;
 
 extern task_struct_t *current_task;
 extern task_struct_t *task[NR_TASKS];
 extern int nr_tasks;
 // this is the task of kernel shell
-#define INIT_TASK { {0,0,0,0,0,0,0,0,0,0,0,0,0}, 0, 0, TASK_RUNNING, -1, PF_KTHREAD}
+#define INIT_TASK { {0,0,0,0,0,0,0,0,0,0,0,0,0}, 0, TASK_RUNNING, -1, PF_KTHREAD, 0}
 
 extern void ret_from_fork(void);
 int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_uint64_t stack);
@@ -58,6 +58,7 @@ void exit_process(void);
 
 void idle_process(void);
 
+void user_process1(unsigned long arg);
 void kernel_procsss(void);
 void user_process(void);
 

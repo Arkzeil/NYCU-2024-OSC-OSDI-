@@ -576,6 +576,8 @@ void memory_reserve(void* start,void* end){
 
     int start_index = get_index(start);
     int end_index = get_index(end);
+    if((my_uint64_t)end % PAGE_SIZE != 0)
+        end_index++;
     int i;
 
     if(end_index < start_index){
@@ -604,7 +606,7 @@ void memory_reserve(void* start,void* end){
                 uart_puts("Warning: The block is already allocated(reserved) in:");
                 uart_b2x_64((unsigned long long)cur->addr);
                 uart_putc('\n');
-                uart_getc();
+                //uart_getc();
                 //return;
             }
 

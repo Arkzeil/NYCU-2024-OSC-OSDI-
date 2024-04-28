@@ -147,7 +147,7 @@ void fork_test(void){
     int cnt = 1;
     int ret = 0;
 
-    if ((ret = fork()) == 0) { // child
+    if ((ret = fork(0)) == 0) { // child
         long long cur_sp;
         asm volatile("mov %0, sp" : "=r"(cur_sp));
         
@@ -163,7 +163,7 @@ void fork_test(void){
 
         ++cnt;
 
-        if ((ret = fork()) != 0){
+        if ((ret = fork(0)) != 0){
             asm volatile("mov %0, sp" : "=r"(cur_sp));
             
             uart_puts("first child pid: ");

@@ -11,6 +11,7 @@ int call_fork();
 void call_exit();
 int call_mbox(unsigned char ch, unsigned int *mbox);
 void call_kill(int pid);
+int call_sys_clone(unsigned long long fn, unsigned long arg, unsigned long long stack);
 
 #endif
 // If __ASSEMBLER__ is defined, it means that the file is being processed by an assembler, and the code between #ifndef __ASSEMBLER__ and #endif will be skipped.

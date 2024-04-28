@@ -51,39 +51,17 @@ int exec(const char* name, char *const argv[]){
     return 0;
 }
 // In C, fork will return 0 to the child process and return the child's pid to the parent process
-int fork(){
-    lock();
-    int parent_pid = cur_thread->pid;
-    thread_t *thrd = thread_create((void*)(cur_thread->context.lr), cur_thread->data);
-    thrd->data_size = cur_thread->data_size;
-    // set child process’s return value to 0 
-    thrd->context.lr = 0;
-    for(int i = 0; i < cur_thread->data_size; i++)
-        thrd->sp[i] = cur_thread->sp[i];
-    
-    unlock();
-    // from now on, the child process might be scheduled to run
-
-
-    // the parent process get the child's pid as return value
-    current_tf->lr = thrd->pid;
-    // return the child's pid if we're parent process
-    if(parent_pid == cur_thread->pid){
-        current_tf->x0 = thrd->pid;
-        return thrd->pid;
-    }
-    // return 0 if we're child process
-    else{
-        current_tf->x0 = 0;
-        return 0;
-    }
+int fork(my_uint64_t stack){
+    return copy_process(0, 0, 0, stack);
 }
 // mark the current thread as zombie and schedule another thread to run
+// this will never return
 void exit(){
-    lock();
-    cur_thread->status = -1; // indicate that this thread is zombie(dead, in this lab)
-    unlock();
-    schedule();
+    // lock();
+    // cur_thread->status = -1; // indicate that this thread is zombie(dead, in this lab)
+    // unlock();
+    // schedule();
+    exit_process();
 }
 
 int mbox_call(unsigned char ch, unsigned int *mbox){

@@ -17,7 +17,7 @@ unsigned int uart_read(char buf[], unsigned int size);
 // write buf to uart
 unsigned int uart_write(char buf[], unsigned int size);
 int exec(const char* name, char *const argv[]);
-int fork();
+int fork(my_uint64_t stack);
 void exit();
 int mbox_call(unsigned char ch, unsigned int *mbox);
 void kill(int pid);

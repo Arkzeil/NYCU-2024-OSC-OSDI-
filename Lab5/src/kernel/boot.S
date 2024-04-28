@@ -172,6 +172,7 @@ system_call_handler:
   save_all
   mov x0, sp              // get trap frame(which is the same thing we just saved, meaning that we might modified user space registers)
   bl c_system_call_handler
+  str x0, [sp, 0]         // save return value to trap frame
   load_all
   eret
 

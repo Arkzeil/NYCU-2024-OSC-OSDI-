@@ -20,8 +20,38 @@ void int_on(void){
     );
 }
 // x0 = tf
-void c_system_call_handler(trap_frame_t *tf){
+int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
     uart_puts("Entering system call handler\n");
+
+    void *spsr1;
+    void *elr1;
+    void *esr1;
+    void *el;
+
+    asm volatile(
+        "mrs %[var1], spsr_el1;"
+        "mrs %[var2], elr_el1;"
+        "mrs %[var3], esr_el1;"
+        "mrs %[var4], CurrentEL;"
+        : [var1] "=r" (spsr1),[var2] "=r" (elr1),[var3] "=r" (esr1),[var4] "=r" (el)    // Output operands
+    );
+
+    uart_puts("Current EL:");
+    uart_b2x_64((unsigned long long)el>>2);     // bits [3:2] contain current El value
+    uart_putc('\n');
+
+    uart_puts("SPSR_EL1:  ");
+    uart_b2x_64((unsigned long long)spsr1);
+    uart_putc('\n');
+
+    uart_puts("ELR_EL1:   ");
+    uart_b2x_64((unsigned long long)elr1);
+    uart_putc('\n');
+
+    uart_puts("ESR_EL1:   ");
+    uart_b2x_64((unsigned long long)esr1);
+    uart_putc('\n');
+
     // based on the lab instruction. The system call numbers given below would be stored in x8
     unsigned long long syscall_num = tf->x8;
     //uart_b2x_64(syscall_num);
@@ -30,27 +60,29 @@ void c_system_call_handler(trap_frame_t *tf){
     uart_b2x_64((unsigned long long)syscall_num);
     uart_putc('\n');
 
+    int val = -1;
+
     switch (syscall_num){
         case 0:
-            getpid();
+            val = getpid();
             break;
         case 1:
-            uart_read((char *)current_tf->x1, current_tf->x2);
+            val = uart_read((char *)current_tf->x1, current_tf->x2);
             break;
         case 2:
-            uart_write((char *)current_tf->x1, current_tf->x2);
+            val = uart_write((char *)current_tf->x1, current_tf->x2);
             break;
         case 3:
-            exec((const char *)current_tf->x1, (char *const *)current_tf->x2);
+            val = exec((const char *)current_tf->x1, (char *const *)current_tf->x2);
             break;
         case 4:
-            fork();
+            val = fork(args);
             break;
         case 5:
             exit();
             break;
         case 6:
-            mbox_call((unsigned char)current_tf->x1, (unsigned int *)current_tf->x2);
+            val = mbox_call((unsigned char)current_tf->x1, (unsigned int *)current_tf->x2);
             break;
         case 7:
             kill((int)current_tf->x1);
@@ -61,6 +93,8 @@ void c_system_call_handler(trap_frame_t *tf){
             uart_putc('\n');
             break;
     }
+
+    return val;
 
     // while(1)
     //     asm volatile("nop");

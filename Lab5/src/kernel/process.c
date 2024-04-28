@@ -16,7 +16,7 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
     task_struct_t *np = (task_struct_t *)pool_alloc(sizeof(task_struct_t));
     // holds the complete register state of a process or thread at a specific point in time, usually when a system call, interrupt, or exception occurs.
     // this is used for load_all as load_all will load from sp
-    np->tf = (trap_frame_t *)pool_alloc(sizeof(trap_frame_t));
+    np->tf = (trap_frame_t *)pool_alloc(4096);
     //trap_frame_t  *tf = (trap_frame_t *)pool_alloc(sizeof(trap_frame_t));
     //show_mem_stat();
     //np->sp = (my_uint64_t)pool_alloc(THREAD_STK_SIZE);
@@ -38,13 +38,17 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
     }
     // if it's user thread, we just copy the trap frame from current task
     else{
+        gdb();
         // 'copy' the state of the current task to the new task(by using pointer dereference)
-        // this requires us to define 'memcpy' by ourself(as we didn't include stadard llibrary) 
+        // this requires us to define 'memcpy' by ourself(as we didn't include stadard library) 
         *(np->tf) = *(current_task->tf);
         // set the return value of the child process to 0
         np->tf->x0 = 0;
-        np->tf->sp_el0 = (my_uint64_t)pool_alloc(THREAD_STK_SIZE);
-        np->sp = np->tf->sp_el0;
+        // user process got its own stack
+        void *new_stack = pool_alloc(THREAD_STK_SIZE);
+        np->tf->sp_el0 = (my_uint64_t)new_stack + THREAD_STK_SIZE;
+        np->sp = (my_uint64_t)new_stack;
+        //return 0;
     }
     uart_puts("context x19: ");
     uart_b2x_64(np->context.x19);
@@ -64,6 +68,9 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
     np->context.lr = (my_uint64_t)ret_from_fork;
     uart_puts("context lr: ");
     uart_b2x_64(np->context.lr);
+    uart_putc('\n');
+    uart_puts("pid:");
+    uart_itoa(np->pid);
     uart_putc('\n');
 
     task[nr_tasks] = np;
@@ -117,6 +124,7 @@ void process_schedule(void){
     }
     if(current_task == next || next == 0){
         uart_puts("No task to schedule\n");
+        delay(1000000);
         unlock();
         return;
     }
@@ -191,23 +199,41 @@ void kernel_procsss(void){
     uart_putc('\n');
     uart_b2x_64((my_uint64_t)current_task->tf->elr_el1);
     uart_putc('\n');
-    gdb();
+}
+
+void user_process1(unsigned long arg){
+    uart_puts("Testing user process1\n");
+    uart_puts((char*)arg);
 }
 
 void user_process(void){
-    void *el;
+    // void *el;
     uart_puts("Entering user process\n");
+    //call_fork();
+    int pid = call_get_pid();
+    uart_itoa(pid);
+    uart_putc('\n');
 
-    uart_itoa(call_get_pid());
+    void *stack = pool_alloc(THREAD_STK_SIZE);
+
+    int err = call_sys_clone((my_uint64_t)&user_process1, (unsigned long)"12345", (my_uint64_t)stack);
+	if (err < 0){
+		uart_puts("Error while clonning process 1\n");
+		return;
+	}
+    // if err > 0, it's parent process
+    uart_puts("Fork return value: ");
+    uart_itoa(err);
     uart_putc('\n');
     // asm volatile(
     //     "mrs %[var1], CurrentEL;"
     //     :[var1] "=r" (el)    // Output operands
     // );
 
-    uart_puts("Current EL:");
+    // uart_puts("Current EL:");
     // uart_b2x_64((my_uint64_t)el>>2);     // bits [3:2] contain current El value
-    uart_putc('\n');
+    // uart_putc('\n');
+    call_exit();
 }
 
 void pfoo(void){
