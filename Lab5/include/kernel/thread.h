@@ -62,6 +62,5 @@ void schedule(void);
 
 void idle_task(void);
 void foo(void);
-void fork_test(void);
 
 #endif

@@ -40,14 +40,15 @@ typedef struct task_struct{
     int status;
     int pid;
     int flag;
-    trap_frame_t *tf;
+    int space[925];
+    trap_frame_t tf;
 }task_struct_t;
 
 extern task_struct_t *current_task;
 extern task_struct_t *task[NR_TASKS];
 extern int nr_tasks;
 // this is the task of kernel shell
-#define INIT_TASK { {0,0,0,0,0,0,0,0,0,0,0,0,0}, 0, TASK_RUNNING, -1, PF_KTHREAD, 0}
+#define INIT_TASK { {0,0,0,0,0,0,0,0,0,0,0,0,0}, 0, TASK_RUNNING, -1, PF_KTHREAD, {0}, {0}}
 
 extern void ret_from_fork(void);
 int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_uint64_t stack);
@@ -61,7 +62,10 @@ void idle_process(void);
 void user_process1(unsigned long arg);
 void kernel_procsss(void);
 void user_process(void);
+void fork_test(void);
 
 void pfoo(void);
+
+trap_frame_t *get_task_tf(task_struct_t *task);
 
 #endif

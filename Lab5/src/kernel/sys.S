@@ -71,20 +71,15 @@ call_kill:
     msr sp_el0, x1
     // restore x0 and x1(as we just use it to restore the information of spsr and elr)
     ldp x0, x1, [sp ,16 * 0]
-    add sp, sp, 32 * 8
+    add sp, sp, 16 * 17
 .endm
 
 .global call_sys_clone
 call_sys_clone:
-	/* Save args for the child.  */
-	mov	x10, x0					/*fn*/
-	mov	x11, x1					/*arg*/
-	mov	x12, x2					/*stack*/
-
-	/* Do the system call.  */
-	mov x1, x2					/* stack  */
+	
 	mov	x8, #4					/* fork */
 	svc	0x0
+	ret
 	/*bl uart_itoa*/
 	cmp	x0, #0					/* check it's child or parent */
 	beq	thread_start			/* child */
@@ -92,7 +87,7 @@ call_sys_clone:
 
 thread_start:
 	/*bl uart_itoa*/
-	mov	x29, 0
+	/*mov	x29, 0*/
 
 	/* Pick the function arg and execute.  */
 	/*mov	x0, x11

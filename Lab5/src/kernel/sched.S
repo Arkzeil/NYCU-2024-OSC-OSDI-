@@ -54,7 +54,7 @@ get_current:
     msr sp_el0, x1
     // restore x0 and x1(as we just use it to restore the information of spsr and elr)
     ldp x0, x1, [sp ,16 * 0]
-    add sp, sp, 32 * 8
+    add sp, sp, 16 * 17
 .endm
 
 .global ret_from_fork

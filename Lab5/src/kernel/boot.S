@@ -76,7 +76,7 @@ from_el2_to_el1:
 
 // save general registers to stack
 .macro save_all
-    sub sp, sp, 32 * 8
+    sub sp, sp, 16 * 17
     stp x0, x1, [sp ,16 * 0]
     stp x2, x3, [sp ,16 * 1]
     stp x4, x5, [sp ,16 * 2]
@@ -130,7 +130,7 @@ from_el2_to_el1:
     msr sp_el0, x1
     // restore x0 and x1(as we just use it to restore the information of spsr and elr)
     ldp x0, x1, [sp ,16 * 0]
-    add sp, sp, 32 * 8
+    add sp, sp, 16 * 17
 .endm
 
 exception_handler:

@@ -13,23 +13,24 @@ void gdb(){
 int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_uint64_t stack){
     lock();
     // allocate a new task struct and trap frame for new process
-    task_struct_t *np = (task_struct_t *)pool_alloc(sizeof(task_struct_t));
+    task_struct_t *np = (task_struct_t *)pool_alloc(THREAD_STK_SIZE);
     // holds the complete register state of a process or thread at a specific point in time, usually when a system call, interrupt, or exception occurs.
     // this is used for load_all as load_all will load from sp
-    np->tf = (trap_frame_t *)pool_alloc(4096);
+    //np->tf = (trap_frame_t *)pool_alloc(THREAD_STK_SIZE);
     //trap_frame_t  *tf = (trap_frame_t *)pool_alloc(sizeof(trap_frame_t));
     //show_mem_stat();
     //np->sp = (my_uint64_t)pool_alloc(THREAD_STK_SIZE);
+    trap_frame_t *tf = get_task_tf(np);
 
-    if(!np || !np->tf){
+    if(!np){
         unlock();
         return -1;
     }
 
     // zero out the process context and trap frame
     // memzero should pass the address of the first byte of the struct
-    memzero(&(np->context), sizeof(process_context_t));
-    memzero(np->tf, sizeof(trap_frame_t));
+    memzero((my_uint64_t)&(np->context), sizeof(process_context_t));
+    memzero((my_uint64_t)&np->tf, sizeof(trap_frame_t));
 
     // if it's kernel thread, we should set the function and argument
     if(clone_flags & PF_KTHREAD){
@@ -38,16 +39,58 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
     }
     // if it's user thread, we just copy the trap frame from current task
     else{
-        gdb();
+        //gdb();
         // 'copy' the state of the current task to the new task(by using pointer dereference)
         // this requires us to define 'memcpy' by ourself(as we didn't include stadard library) 
-        *(np->tf) = *(current_task->tf);
+        //*(np->tf) = *(current_task->tf);
+        np->tf.x0 = current_task->tf.x0;
+        np->tf.x1 = current_task->tf.x1;
+        np->tf.x2 = current_task->tf.x2;
+        np->tf.x3 = current_task->tf.x3;
+        np->tf.x4 = current_task->tf.x4;
+        np->tf.x5 = current_task->tf.x5;
+        np->tf.x6 = current_task->tf.x6;
+        np->tf.x7 = current_task->tf.x7;
+        np->tf.x8 = current_task->tf.x8;
+        np->tf.x9 = current_task->tf.x9;
+        np->tf.x10 = current_task->tf.x10;
+        np->tf.x11 = current_task->tf.x11;
+        np->tf.x12 = current_task->tf.x12;
+        np->tf.x13 = current_task->tf.x13;
+        np->tf.x14 = current_task->tf.x14;
+        np->tf.x15 = current_task->tf.x15;
+        np->tf.x16 = current_task->tf.x16;
+        np->tf.x17 = current_task->tf.x17;
+        np->tf.x18 = current_task->tf.x18;
+        np->tf.x19 = current_task->tf.x19;
+        np->tf.x20 = current_task->tf.x20;
+        np->tf.x21 = current_task->tf.x21;
+        np->tf.x22 = current_task->tf.x22;
+        np->tf.x23 = current_task->tf.x23;
+        np->tf.x24 = current_task->tf.x24;
+        np->tf.x25 = current_task->tf.x25;
+        np->tf.x26 = current_task->tf.x26;
+        np->tf.x27 = current_task->tf.x27;
+        np->tf.x28 = current_task->tf.x28;
+        np->tf.fp = current_task->tf.fp;
+        np->tf.lr = current_task->tf.lr;
+        np->tf.spsr_el1 = current_task->tf.spsr_el1;
+        np->tf.elr_el1 = current_task->tf.elr_el1;
+        np->tf.sp_el0 = current_task->tf.sp_el0;
+
         // set the return value of the child process to 0
-        np->tf->x0 = 0;
+        np->tf.x0 = 0;
         // user process got its own stack
         void *new_stack = pool_alloc(THREAD_STK_SIZE);
-        np->tf->sp_el0 = (my_uint64_t)new_stack + THREAD_STK_SIZE;
+        np->tf.sp_el0 = (my_uint64_t)(new_stack + current_task->tf.sp_el0 - current_task->sp);
+        np->tf.fp = (my_uint64_t)(new_stack + current_task->tf.sp_el0 - current_task->sp);
         np->sp = (my_uint64_t)new_stack;
+        // copy the stack from parent process to child process
+        // for(int i = 0; i < 925; i++)
+        //     np->space[i] = current_task->space[i];
+        for(int i = 0; i < THREAD_STK_SIZE; i++){
+            *((char*)np->sp + i) = *((char*)current_task->sp + i);
+        }
         //return 0;
     }
     uart_puts("context x19: ");
@@ -64,7 +107,8 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
     /* this one is crucial  */
     /*                      */
     /*                      */
-    np->context.sp = (my_uint64_t)np->tf;
+    // use the space between metadata and trap frame as stack
+    np->context.sp = (my_uint64_t)&(np->tf);
     np->context.lr = (my_uint64_t)ret_from_fork;
     uart_puts("context lr: ");
     uart_b2x_64(np->context.lr);
@@ -83,18 +127,19 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
 // this is achieved by changing current task's trap frame 
 int to_el0(my_uint64_t fn){
     uart_puts("Starting moving to user mode\n");
-    memzero(current_task->tf, sizeof(trap_frame_t));
+    memzero((my_uint64_t)&current_task->tf, sizeof(trap_frame_t));
     // since after the kernel process is finished, it will return to '1:' block of ret_from_work, which will then exexute load_all
     // and current sp is current_task->tf
-    current_task->tf->elr_el1 = fn;
-    current_task->tf->spsr_el1 = 0x00000000;
-    //current_task->tf->spsr_el1 |= (1 << 0); // set the M[0] bit to 1, which means the processor is in EL0
-    //current_task->tf->spsr_el1 |= (1 << 6); // set the DAIF[6] bit to 1, which means the processor is in EL0
+    current_task->tf.elr_el1 = fn;
+    current_task->tf.spsr_el1 = 0x00000000;
+    //current_task->tf.spsr_el1 |= (1 << 0); // set the M[0] bit to 1, which means the processor is in EL0
+    //current_task->tf.spsr_el1 |= (1 << 6); // set the DAIF[6] bit to 1, which means the processor is in EL0
     void *stack = pool_alloc(THREAD_STK_SIZE);
     if(!stack)
         return -1;
-    
-    current_task->tf->sp_el0 = (my_uint64_t)(stack + THREAD_STK_SIZE);
+    gdb();
+    current_task->tf.sp_el0 = (my_uint64_t)(stack + THREAD_STK_SIZE);
+    current_task->tf.fp = (my_uint64_t)(stack + THREAD_STK_SIZE);
     current_task->sp = (my_uint64_t)stack;
     
     return 0;
@@ -185,7 +230,8 @@ void kernel_procsss(void){
     uart_b2x_64((my_uint64_t)elr);
     uart_putc('\n');
     
-    int err = to_el0((my_uint64_t)&user_process);
+    //int err = to_el0((my_uint64_t)&user_process);
+    int err = to_el0((my_uint64_t)&fork_test);
     if(err < 0)
         uart_puts("Error while moving to user mode\n");
     
@@ -197,7 +243,7 @@ void kernel_procsss(void){
     );
     uart_b2x_64((my_uint64_t)elr);
     uart_putc('\n');
-    uart_b2x_64((my_uint64_t)current_task->tf->elr_el1);
+    uart_b2x_64((my_uint64_t)current_task->tf.elr_el1);
     uart_putc('\n');
 }
 
@@ -206,17 +252,96 @@ void user_process1(unsigned long arg){
     uart_puts((char*)arg);
 }
 
+void fork_test(void){
+    uart_puts("\nFork Test, pid: ");
+    uart_itoa(call_get_pid());
+    uart_putc('\n');
+    gdb();
+    int cnt = 1;
+    int ret = 0;
+    void *stack;
+    stack = pool_alloc(THREAD_STK_SIZE);
+
+    if ((ret = call_sys_clone(0, 0, (my_uint64_t)stack)) == 0) { // child
+        long long cur_sp;
+        asm volatile("mov %0, sp" : "=r"(cur_sp));
+        gdb();
+        uart_puts("first child pid: ");
+        uart_itoa(call_get_pid());
+        uart_puts(", cnt: ");
+        uart_itoa(cnt);
+        uart_puts(", ptr: ");
+        uart_b2x_64((unsigned long long)&cnt);
+        uart_puts(", sp : ");
+        uart_b2x_64(cur_sp);
+        uart_putc('\n');
+
+        ++cnt;
+        stack = pool_alloc(THREAD_STK_SIZE);
+
+        if ((ret = call_sys_clone(0, 0, (my_uint64_t)stack) ) != 0){
+            asm volatile("mov %0, sp" : "=r"(cur_sp));
+            
+            uart_puts("first(2) child pid: ");
+            uart_itoa(call_get_pid());
+            uart_puts(", cnt: ");
+            uart_itoa(cnt);
+            uart_puts(", ptr: ");
+            uart_b2x_64((unsigned long long)&cnt);
+            uart_puts(", sp : ");
+            uart_b2x_64(cur_sp);
+            uart_putc('\n');
+        }
+        else{
+            while (cnt < 5) {
+                asm volatile("mov %0, sp" : "=r"(cur_sp));
+                
+                uart_puts("second child pid: ");
+                uart_itoa(call_get_pid());
+                uart_puts(", cnt: ");
+                uart_itoa(cnt);
+                uart_puts(", ptr: ");
+                uart_b2x_64((unsigned long long)&cnt);
+                uart_puts(", sp : ");
+                uart_b2x_64(cur_sp);
+                uart_putc('\n');
+
+                delay(1000000);
+                ++cnt;
+            }
+        }
+        call_exit();
+    }
+    else {
+        gdb();
+        uart_puts("parent here, pid ");
+        uart_itoa(call_get_pid());
+        uart_puts(", child ");
+        uart_itoa(ret);
+        uart_putc('\n');
+        call_exit();
+    }
+}
+
 void user_process(void){
     // void *el;
     uart_puts("Entering user process\n");
     //call_fork();
     int pid = call_get_pid();
+    int var = 1;
     uart_itoa(pid);
     uart_putc('\n');
 
-    void *stack = pool_alloc(THREAD_STK_SIZE);
+    long long cur_sp;
+    asm volatile("mov %0, sp" : "=r"(cur_sp));
 
-    int err = call_sys_clone((my_uint64_t)&user_process1, (unsigned long)"12345", (my_uint64_t)stack);
+    uart_puts("Current sp:");
+    uart_b2x_64(cur_sp);
+    uart_putc('\n');
+
+    void *stack = pool_alloc(THREAD_STK_SIZE);
+    // int err = call_sys_clone((my_uint64_t)&user_process1, (unsigned long)"12345", (my_uint64_t)stack);
+    int err = call_sys_clone(0, 0, (my_uint64_t)stack);
 	if (err < 0){
 		uart_puts("Error while clonning process 1\n");
 		return;
@@ -224,6 +349,9 @@ void user_process(void){
     // if err > 0, it's parent process
     uart_puts("Fork return value: ");
     uart_itoa(err);
+    uart_putc('\n');
+    uart_puts("Var: ");
+    uart_itoa(var);
     uart_putc('\n');
     // asm volatile(
     //     "mrs %[var1], CurrentEL;"
@@ -233,6 +361,7 @@ void user_process(void){
     // uart_puts("Current EL:");
     // uart_b2x_64((my_uint64_t)el>>2);     // bits [3:2] contain current El value
     // uart_putc('\n');
+    uart_puts("Exiting user process\n");
     call_exit();
 }
 
@@ -246,4 +375,9 @@ void pfoo(void){
         delay(1000000);
         process_schedule();
     }
+}
+
+trap_frame_t *get_task_tf(task_struct_t *task){
+    my_uint64_t p = (my_uint64_t)task + THREAD_STK_SIZE - sizeof(trap_frame_t);
+    return (trap_frame_t *)p;
 }
