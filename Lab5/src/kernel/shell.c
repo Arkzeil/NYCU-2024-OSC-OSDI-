@@ -285,6 +285,8 @@ void my_shell(){
             idle_task();
         }
         else if(!string_comp(buf, "process")){
+            int_on();
+            uart_irq_on();
             //uart_itoa(sizeof(buddy_block_list_t));
             //uart_putc('\n');
             uart_b2x_64((my_uint64_t)&idle_process);
@@ -300,6 +302,25 @@ void my_shell(){
             //idle_process();
             //while(1)
                 process_schedule();
+        }
+        else if(!string_comp(buf, "test2")){
+            unsigned int mailbox[32];
+
+            mailbox[0] = 7 * 4;               // buffer size in bytes (size of the message in bytes)
+            mailbox[1] = REQUEST_CODE;        // MBOX_REQUEST magic value, indicates request message
+            // tags begin
+            mailbox[2] = GET_BOARD_REVISION;  // tag identifier
+            mailbox[3] = 4;                   // maximum of request and response value buffer's length.(value buffer size in bytes)
+            mailbox[4] = TAG_REQUEST_CODE;    // must be zero
+            mailbox[5] = 0;                   // (optional) value buffer
+            // tags end
+            mailbox[6] = END_TAG;
+
+            mbox_call(8, mailbox);
+
+            uart_puts("My board revision: ");
+            uart_b2x(mailbox[5]);           // 0x00A02082 for QEMU?
+            uart_puts("\r\n");
         }
         else{
             uart_puts("Unknown Command: ");

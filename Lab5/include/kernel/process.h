@@ -60,6 +60,7 @@ void exit_process(void);
 void idle_process(void);
 
 void user_process1(unsigned long arg);
+void user_process2(void);
 void kernel_procsss(void);
 void user_process(void);
 void fork_test(void);

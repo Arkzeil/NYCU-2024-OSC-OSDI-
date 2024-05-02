@@ -67,13 +67,13 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
             val = getpid();
             break;
         case 1:
-            val = uart_read((char *)current_tf->x1, current_tf->x2);
+            val = uart_read((char *)current_tf->x0, current_tf->x1);
             break;
         case 2:
-            val = uart_write((char *)current_tf->x1, current_tf->x2);
+            val = uart_write((char *)current_tf->x0, current_tf->x1);
             break;
         case 3:
-            val = exec((const char *)current_tf->x1, (char *const *)current_tf->x2);
+            val = exec((const char *)current_tf->x0, (char *const *)current_tf->x1);
             break;
         case 4:
             val = fork(args);
@@ -82,7 +82,7 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
             exit();
             break;
         case 6:
-            val = mbox_call((unsigned char)current_tf->x1, (unsigned int *)current_tf->x2);
+            val = mbox_call((unsigned char)current_tf->x0, (unsigned int *)current_tf->x1);
             break;
         case 7:
             kill((int)current_tf->x1);
@@ -338,6 +338,7 @@ void c_general_irq_handler(){
         // [2:1]=10 : Receiver holds valid byte 
         if(irq_status & 0x4){
             // disable receive interrupt by setting bit1 to 0
+            //uart_puts("Receive IRQ\n");
             mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG & ~(0x1));
             if(test_NI == 0)
                 task_create_DF0(c_recv_handler, 1);
@@ -351,7 +352,7 @@ void c_general_irq_handler(){
         }
         // [2:1]=01 : Transmit holding register empty
         if(irq_status & 0x2){
-            uart_puts("Transmit IRQ\n");
+            //uart_puts("Transmit IRQ\n");
             // disable transmit interrupt, set bit2 to 0
             mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG & ~(0x2));
             //c_write_handler();

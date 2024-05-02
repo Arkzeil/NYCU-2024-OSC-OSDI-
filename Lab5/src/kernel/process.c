@@ -82,6 +82,10 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
         np->tf.x0 = 0;
         // user process got its own stack
         void *new_stack = pool_alloc(THREAD_STK_SIZE);
+        // The compiler will automatically copy the stack when newly created child process return to a function
+        // So we must reserve the space of local variables for the child process, e.g. parent:0x194000->0x193FD0, child's stack start from 0x195000
+        // If we don't adjust it, it will save the local variables of parent process to the child process's stack at 0x195000 to 0x195030
+        // So we must adjust the stack pointer of the child process to 0x195000 + 0x30(i.e. 0x195000 - (0x193FD0 - 0x193000) ), 
         np->tf.sp_el0 = (my_uint64_t)(new_stack + current_task->tf.sp_el0 - current_task->sp);
         np->tf.fp = (my_uint64_t)(new_stack + current_task->tf.sp_el0 - current_task->sp);
         np->sp = (my_uint64_t)new_stack;
@@ -230,8 +234,8 @@ void kernel_procsss(void){
     uart_b2x_64((my_uint64_t)elr);
     uart_putc('\n');
     
-    //int err = to_el0((my_uint64_t)&user_process);
-    int err = to_el0((my_uint64_t)&fork_test);
+    int err = to_el0((my_uint64_t)&user_process2);
+    //int err = to_el0((my_uint64_t)&fork_test);
     if(err < 0)
         uart_puts("Error while moving to user mode\n");
     
@@ -250,6 +254,48 @@ void kernel_procsss(void){
 void user_process1(unsigned long arg){
     uart_puts("Testing user process1\n");
     uart_puts((char*)arg);
+}
+void user_process2(void){
+    unsigned int mailbox[32];
+
+    mailbox[0] = 7 * 4;               // buffer size in bytes (size of the message in bytes)
+    mailbox[1] = REQUEST_CODE;        // MBOX_REQUEST magic value, indicates request message
+    // tags begin
+    mailbox[2] = GET_BOARD_REVISION;  // tag identifier
+    mailbox[3] = 4;                   // maximum of request and response value buffer's length.(value buffer size in bytes)
+    mailbox[4] = TAG_REQUEST_CODE;    // must be zero
+    mailbox[5] = 0;                   // (optional) value buffer
+    // tags end
+    mailbox[6] = END_TAG;
+
+    call_mbox((unsigned char)8, mailbox);
+
+    uart_puts("My board revision: ");
+    uart_b2x(mailbox[5]);
+    uart_puts("\r\n");
+
+    uart_puts("-------------------------\n");
+    char async_buf[50];
+    int ticks = 150;
+
+    call_uart_write("Enter a string: ", 16);
+    while(ticks--);
+
+    int received = call_uart_read(async_buf, 5);
+
+    uart_puts("Bytes received: ");
+    uart_itoa(received);
+    uart_putc('\n');
+
+    int printed =  call_uart_write(async_buf, 5);
+    ticks = 150;
+    while(ticks--);
+
+    uart_puts("Bytes printed: ");
+    uart_itoa(printed);
+    uart_putc('\n');
+
+    call_exit();
 }
 
 void fork_test(void){
@@ -338,6 +384,9 @@ void user_process(void){
     uart_puts("Current sp:");
     uart_b2x_64(cur_sp);
     uart_putc('\n');
+
+    uart_puts("Mbox: ");
+    uart_itoa(call_mbox(0, 0));
 
     void *stack = pool_alloc(THREAD_STK_SIZE);
     // int err = call_sys_clone((my_uint64_t)&user_process1, (unsigned long)"12345", (my_uint64_t)stack);

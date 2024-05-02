@@ -317,17 +317,19 @@ void uart_irq_off(){
 }
 
 int uart_irq_getc(){
-    // there's char in buffer
-    if(read_index_cur != read_index_tail){
-        int_off();
-        int c = (int)read_buffer[read_index_cur++];
-        // make it circular
-        read_index_cur = read_index_cur % MAX_BUF_LEN;
-        int_on();
-        return c;
+    while(1){
+        // there's char in buffer
+        if(read_index_cur != read_index_tail){
+            int_off();
+            int c = (int)read_buffer[read_index_cur++];
+            // make it circular
+            read_index_cur = read_index_cur % MAX_BUF_LEN;
+            int_on();
+            return c;
+        }
     }
-    else
-        return -1;
+    // else
+    //     return -1;
 }
 
 void uart_irq_putc(unsigned char c){

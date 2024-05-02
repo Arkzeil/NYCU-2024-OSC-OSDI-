@@ -10,9 +10,11 @@ int getpid(){
 
 unsigned int uart_read(char buf[], unsigned int size){
     int i;
+    unlock();
     // no overflow protection
     for(i = 0; i < size; i++){
-        buf[i] = uart_getc();
+        //buf[i] = uart_getc();
+        buf[i] = (char)uart_irq_getc();
     }
 
     current_tf->x0 = i;
@@ -21,9 +23,11 @@ unsigned int uart_read(char buf[], unsigned int size){
 
 unsigned int uart_write(char buf[], unsigned int size){
     int i;
+    
     // no overflow protection
     for(i = 0; i < size; i++){
-        uart_putc(buf[i]);
+        //uart_putc(buf[i]);
+        uart_irq_putc(buf[i]);
     }
 
     current_tf->x0 = i;
