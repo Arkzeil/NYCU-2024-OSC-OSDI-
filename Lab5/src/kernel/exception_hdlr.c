@@ -21,7 +21,7 @@ void int_on(void){
 }
 // x0 = tf
 int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
-    uart_puts("Entering system call handler\n");
+    /*uart_puts("Entering system call handler\n");
 
     void *spsr1;
     void *elr1;
@@ -50,15 +50,15 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
 
     uart_puts("ESR_EL1:   ");
     uart_b2x_64((unsigned long long)esr1);
-    uart_putc('\n');
+    uart_putc('\n');*/
 
     // based on the lab instruction. The system call numbers given below would be stored in x8
     unsigned long long syscall_num = tf->x8;
     //uart_b2x_64(syscall_num);
     //uart_putc('\n');
     current_tf = tf;
-    uart_b2x_64((unsigned long long)syscall_num);
-    uart_putc('\n');
+    // uart_b2x_64((unsigned long long)syscall_num);
+    // uart_putc('\n');
 
     int val = -1;
 
@@ -370,7 +370,10 @@ void c_general_irq_handler(){
     if(cpu_irq_src & (0x1 << 1)){
         uart_puts("Timer IRQ\n");
 
-        if(boot_timer_flag != 0){
+        if(boot_timer_flag == 2){
+            process_schedule();
+        }
+        else if(boot_timer_flag != 0){
             c_core_timer_handler();
         }
         else{

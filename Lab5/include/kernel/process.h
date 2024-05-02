@@ -8,6 +8,7 @@
 #include "kernel/syscall.h"
 #include "kernel/type.h"
 #include "kernel/sys.h"
+#include "kernel/timer.h"
 
 #define NR_TASKS 64
 #define TASK_RUNNING 1
@@ -63,6 +64,7 @@ void user_process1(unsigned long arg);
 void user_process2(void);
 void kernel_procsss(void);
 void user_process(void);
+void file_process(my_uint64_t file_addr);
 void fork_test(void);
 
 void pfoo(void);

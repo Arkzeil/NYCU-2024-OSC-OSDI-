@@ -14,6 +14,8 @@ void my_shell(){
     for(buf_index = 0; buf_index < 5; buf_index++)
         argv[buf_index] = simple_malloc(MAX_ARGV_LEN);
 
+    copy_process(PF_KTHREAD, (my_uint64_t)&idle_process, 0, 0);
+
     while(1){
         buf_index = 0;
         string_set(buf, 0, MAX_BUF_LEN);
@@ -289,13 +291,13 @@ void my_shell(){
             uart_irq_on();
             //uart_itoa(sizeof(buddy_block_list_t));
             //uart_putc('\n');
-            uart_b2x_64((my_uint64_t)&idle_process);
-            uart_putc('\n');
-            uart_b2x_64((my_uint64_t)&kernel_procsss);
-            uart_putc('\n');
-            int res = copy_process(PF_KTHREAD, (my_uint64_t)&idle_process, 0, 0);
+            // uart_b2x_64((my_uint64_t)&idle_process);
+            // uart_putc('\n');
+            // uart_b2x_64((my_uint64_t)&kernel_procsss);
+            // uart_putc('\n');
+            //int res = copy_process(PF_KTHREAD, (my_uint64_t)&idle_process, 0, 0);
             int res2 = copy_process(PF_KTHREAD, (my_uint64_t)&kernel_procsss, 0, 0);
-            if(res < 0 || res2 < 0){
+            if(res2 < 0){
                 uart_puts("Create process failed\n");
                 continue;
             }
@@ -304,23 +306,34 @@ void my_shell(){
                 process_schedule();
         }
         else if(!string_comp(buf, "test2")){
-            unsigned int mailbox[32];
+            void *file_addr;
+            buf_index = 0;
+            string_set(buf, 0, MAX_BUF_LEN);
+            
+            uart_puts("Program name: ");
 
-            mailbox[0] = 7 * 4;               // buffer size in bytes (size of the message in bytes)
-            mailbox[1] = REQUEST_CODE;        // MBOX_REQUEST magic value, indicates request message
-            // tags begin
-            mailbox[2] = GET_BOARD_REVISION;  // tag identifier
-            mailbox[3] = 4;                   // maximum of request and response value buffer's length.(value buffer size in bytes)
-            mailbox[4] = TAG_REQUEST_CODE;    // must be zero
-            mailbox[5] = 0;                   // (optional) value buffer
-            // tags end
-            mailbox[6] = END_TAG;
+            buf_index = uart_gets(buf, argv);
+            if(buf_index >= MAX_BUF_LEN)
+                uart_puts("Warning: buffer is full, command output may not correct\n");
 
-            mbox_call(8, mailbox);
+            file_addr = cpio_find(buf);
+            // indicating that the file is either a directory or not exist
+            if(file_addr == 0)
+                continue;
 
-            uart_puts("My board revision: ");
-            uart_b2x(mailbox[5]);           // 0x00A02082 for QEMU?
-            uart_puts("\r\n");
+            uart_b2x_64((my_uint64_t)file_addr);
+            uart_putc('\n');
+
+            int_on();
+            uart_irq_on();
+
+            int res = copy_process(PF_KTHREAD, (my_uint64_t)&file_process, (my_uint64_t)file_addr, 0);
+            if(res < 0){
+                uart_puts("Create process failed\n");
+                continue;
+            }
+            
+            process_schedule();
         }
         else{
             uart_puts("Unknown Command: ");

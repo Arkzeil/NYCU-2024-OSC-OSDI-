@@ -3,7 +3,9 @@
 trap_frame_t *current_tf;
 
 int getpid(){
-    uart_puts("getpid\n");
+    uart_puts("getpid: ");
+    uart_itoa(current_task->pid);
+    uart_puts("\n");
     current_tf->x0 = current_task->pid; 
     return current_task->pid;
 }
@@ -101,24 +103,18 @@ int mbox_call(unsigned char ch, unsigned int *mbox){
 }
 
 void kill(int pid){
-    thread_t *current = run_queue;
-    for(; current != 0; current = current->next){
-        if(current->pid == pid){
-            current->status = -1; // mark as zombie
-            return;
-        }
+    if(pid < 0 || pid >= NR_TASKS){
+        uart_puts("Invalid PID\n");
+        return;
     }
-    // if the pid is not found in run_queue, search in wait_queue
-    current = wait_queue;
-    for(; current != 0; current = current->next){
-        if(current->pid == pid){
-            current->status = -1; // mark as zombie
-            return;
-        }
+
+    if(pid == current_task->pid){
+        uart_puts("Cannot kill current task\n");
+        return;
     }
-    // if the pid is not found in wait_queue, search in idle thread
-    if(current->pid == pid){
-        current->status = -1; // mark as zombie
+    
+    if(task[pid] != 0){
+        task[pid]->status = TASK_ZOMBIE;
         return;
     }
     // PID not found

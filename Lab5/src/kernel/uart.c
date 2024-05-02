@@ -317,6 +317,7 @@ void uart_irq_off(){
 }
 
 int uart_irq_getc(){
+    uart_irq_on();
     while(1){
         // there's char in buffer
         if(read_index_cur != read_index_tail){
@@ -327,6 +328,8 @@ int uart_irq_getc(){
             int_on();
             return c;
         }
+        else
+            unlock();
     }
     // else
     //     return -1;
@@ -339,6 +342,7 @@ void uart_irq_putc(unsigned char c){
     write_index_tail = write_index_tail % MAX_BUF_LEN;
     
     int_on();
+    uart_irq_on();
     //p.12 The AUX_MU_IER_REG register is primary used to enable interrupts 
     mmio_write((long)AUX_MU_IER_REG, *AUX_MU_IER_REG | 0x2);
 }

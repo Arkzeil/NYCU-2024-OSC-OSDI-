@@ -234,8 +234,8 @@ void kernel_procsss(void){
     uart_b2x_64((my_uint64_t)elr);
     uart_putc('\n');
     
-    int err = to_el0((my_uint64_t)&user_process2);
-    //int err = to_el0((my_uint64_t)&fork_test);
+    //int err = to_el0((my_uint64_t)&user_process2);
+    int err = to_el0((my_uint64_t)&fork_test);
     if(err < 0)
         uart_puts("Error while moving to user mode\n");
     
@@ -367,6 +367,33 @@ void fork_test(void){
         uart_putc('\n');
         call_exit();
     }
+}
+
+void schedule_timer(void *nouse){
+     unsigned long long cntfrq_el0;
+    __asm__ __volatile__("mrs %0, cntfrq_el0\n\t": "=r"(cntfrq_el0)); //tick frequency
+    add_timer(schedule_timer, (void*)"", cntfrq_el0 >> 5);
+}
+
+void file_process(my_uint64_t file_addr){
+    uart_puts("File process\n");
+    uart_b2x_64(file_addr);
+    uart_putc('\n');
+    to_el0((my_uint64_t)file_addr);
+
+    uint64_t tmp;
+    boot_timer_flag = 2;
+
+   
+    
+    asm volatile("mrs %0, cntkctl_el1" : "=r"(tmp));
+    tmp |= 1;
+    asm volatile("msr cntkctl_el1, %0" : : "r"(tmp));
+
+    mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
+    add_timer(schedule_timer, (void*)"", 1);
+
+    //call_exit();
 }
 
 void user_process(void){

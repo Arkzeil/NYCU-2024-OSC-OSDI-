@@ -647,7 +647,7 @@ void startup_init(void){
     memory_reserve((void*)&_start, (void*)&__end);
     show_mem_stat();
     // reserve the CPIO archive in the physical memory
-    memory_reserve((void*)cpio_addr, (void*)cpio_addr + 0x100000);
+    memory_reserve((void*)cpio_addr, (void*)cpio_addr + 0x300000);
     show_mem_stat();
     // reserve the device tree blob in the physical memory
     memory_reserve((void*)_dtb_addr, (void*)_dtb_addr + 0x30000);

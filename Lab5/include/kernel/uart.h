@@ -4,6 +4,7 @@
 #include "kernel/gpio.h"
 #include "kernel/INT.h"
 #include "kernel/exception_hdlr.h"
+#include "kernel/lock.h"
 
 #define MAX_BUF_LEN 512
 #define MAX_ARGV_LEN 32
