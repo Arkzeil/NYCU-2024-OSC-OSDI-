@@ -46,7 +46,7 @@ typedef struct task_struct{
 }task_struct_t;
 
 extern task_struct_t *current_task;
-extern task_struct_t *task[NR_TASKS];
+extern task_struct_t *PCB[NR_TASKS];
 extern int nr_tasks;
 // this is the task of kernel shell
 #define INIT_TASK { {0,0,0,0,0,0,0,0,0,0,0,0,0}, 0, TASK_RUNNING, -1, PF_KTHREAD, {0}, {0}}

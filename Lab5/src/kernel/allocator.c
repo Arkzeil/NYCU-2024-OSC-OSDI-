@@ -647,7 +647,7 @@ void startup_init(void){
     memory_reserve((void*)&_start, (void*)&__end);
     show_mem_stat();
     // reserve the CPIO archive in the physical memory
-    memory_reserve((void*)cpio_addr, (void*)cpio_addr + 0x300000);
+    memory_reserve((void*)cpio_addr, (void*)cpio_end);
     show_mem_stat();
     // reserve the device tree blob in the physical memory
     memory_reserve((void*)_dtb_addr, (void*)_dtb_addr + 0x30000);
@@ -656,6 +656,6 @@ void startup_init(void){
     memory_reserve((void*)BUDDY_METADATA_ADDR, (void*)BUDDY_METADATA_ADDR + sizeof(buddy_system_t) + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));
     show_mem_stat();
     // reserve the pool metadata in the physical memory
-    memory_reserve((void*)&__end, (void*)allocated);
+    memory_reserve((void*)&__end, (void*)allocated + 0x100000);
     show_mem_stat();
 }

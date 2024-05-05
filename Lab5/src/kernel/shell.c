@@ -307,16 +307,21 @@ void my_shell(){
         }
         else if(!string_comp(buf, "test2")){
             void *file_addr;
-            buf_index = 0;
-            string_set(buf, 0, MAX_BUF_LEN);
+            int file_name_len;
+            char file_name[50];
+            uint64_t tmp; 
+
+            asm volatile("mrs %0, cntkctl_el1" : "=r"(tmp));
+            tmp |= 1;
+            asm volatile("msr cntkctl_el1, %0" : : "r"(tmp));
             
             uart_puts("Program name: ");
 
-            buf_index = uart_gets(buf, argv);
-            if(buf_index >= MAX_BUF_LEN)
+            file_name_len = uart_irq_gets(file_name);
+            if(file_name_len >= 50)
                 uart_puts("Warning: buffer is full, command output may not correct\n");
 
-            file_addr = cpio_find(buf);
+            file_addr = cpio_find(file_name);
             // indicating that the file is either a directory or not exist
             if(file_addr == 0)
                 continue;

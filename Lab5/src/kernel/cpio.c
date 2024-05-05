@@ -2,6 +2,8 @@
 #include "kernel/utils.h"
 #include "kernel/uart.h"
 
+unsigned int cpio_file_size = 0;
+
 void *cpio_find(char *input){
     char *temp_addr = cpio_addr;
     struct cpio_newc_header* header = (struct cpio_newc_header*)temp_addr;
@@ -23,6 +25,7 @@ void *cpio_find(char *input){
                 return 0;
             }
             else{
+                cpio_file_size = filesize;
                 return (void*)((char*)(temp_addr + sizeof(struct cpio_newc_header) + namesize + align_offset((sizeof(struct cpio_newc_header) + namesize), 4) ));
             }
         }

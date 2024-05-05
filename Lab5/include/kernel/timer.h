@@ -18,6 +18,7 @@ extern task_timer_t* timer_head;
 extern task_timer_t* timer_tail;
 
 int add_timer(void (*callback)(void *), void* data, int after);
+int add_timer_NA(void (*callback)(void), int after);
 void print_callback(void *str);
 void settimeout(char *str, int second);
 

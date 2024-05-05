@@ -171,10 +171,10 @@ general_irq_handler:
 system_call_handler:
   save_all
 
-  mrs	x25, esr_el1				// read the syndrome register
+  /*mrs	x25, esr_el1				// read the syndrome register
   lsr	x24, x25, #26   		// exception class, get bit[31:26]
   cmp	x24, #0x15			    // SVC in 64-bit state(https://blog.csdn.net/lsshao/article/details/119379653)
-  b.ne	c_exception_handler
+  b.ne	c_exception_handler*/
 
   mov x0, sp              // get trap frame(which is the same thing we just saved, meaning that we might modified user space registers)
   bl c_system_call_handler

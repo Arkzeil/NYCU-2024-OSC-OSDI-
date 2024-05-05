@@ -21,6 +21,7 @@ void int_on(void){
 }
 // x0 = tf
 int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
+    int_on();
     /*uart_puts("Entering system call handler\n");
 
     void *spsr1;
@@ -57,7 +58,7 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
     //uart_b2x_64(syscall_num);
     //uart_putc('\n');
     current_tf = tf;
-    // uart_b2x_64((unsigned long long)syscall_num);
+    //uart_b2x_64((unsigned long long)syscall_num);
     // uart_putc('\n');
 
     int val = -1;
@@ -73,19 +74,24 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
             val = uart_write((char *)current_tf->x0, current_tf->x1);
             break;
         case 3:
+            uart_b2x_64((unsigned long long)syscall_num);
             val = exec((const char *)current_tf->x0, (char *const *)current_tf->x1);
             break;
         case 4:
+            uart_b2x_64((unsigned long long)syscall_num);
             val = fork(args);
             break;
         case 5:
+            uart_b2x_64((unsigned long long)syscall_num);
             exit();
             break;
         case 6:
+            uart_b2x_64((unsigned long long)syscall_num);
             val = mbox_call((unsigned char)current_tf->x0, (unsigned int *)current_tf->x1);
             break;
         case 7:
-            kill((int)current_tf->x1);
+            uart_b2x_64((unsigned long long)syscall_num);
+            kill((int)current_tf->x0);
             break;
         default:
             uart_puts("Unknown system call number: ");
@@ -368,9 +374,15 @@ void c_general_irq_handler(){
     // CNTPNSIRQ interrupt bit, this is by observation, not quite sure why is that bit(which is Non-secure physical timer event.)
     // https://developer.arm.com/documentation/100964/1118/Fast-Models-components/SystemIP-components/GIC-400
     if(cpu_irq_src & (0x1 << 1)){
-        uart_puts("Timer IRQ\n");
+        //uart_puts("Timer IRQ\n");
 
         if(boot_timer_flag == 2){
+            mmio_write((long)CORE0_TIMER_IRQ_CTRL, 0);
+            //task_create_DF0(process_schedule, 0);
+            //process_schedule();
+            task_create_DF0(c_timer_handler, 0);
+            prep_task();
+            mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
             process_schedule();
         }
         else if(boot_timer_flag != 0){

@@ -13,9 +13,9 @@ extern trap_frame_t *current_tf;
 
 int getpid();
 // read user input from uart into buf
-unsigned int uart_read(char buf[], unsigned int size);
+unsigned int uart_read(char buf[], my_uint64_t size);
 // write buf to uart
-unsigned int uart_write(char buf[], unsigned int size);
+unsigned int uart_write(const char buf[], my_uint64_t size);
 int exec(const char* name, char *const argv[]);
 int fork(my_uint64_t stack);
 void exit();

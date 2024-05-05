@@ -6,6 +6,7 @@
 #include "kernel/dtb.h"
 // this one need to be outside any function
 char *cpio_addr;
+char *cpio_end;
 extern void* _dtb_addr;
 
 void main(void)

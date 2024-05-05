@@ -2,7 +2,7 @@
 
 task_struct_t init_task = INIT_TASK;
 task_struct_t *current_task = &init_task;
-task_struct_t *task[NR_TASKS] = {&(init_task), };
+task_struct_t *PCB[NR_TASKS] = {&(init_task), };
 
 int nr_tasks = 0;
 
@@ -121,7 +121,7 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
     uart_itoa(np->pid);
     uart_putc('\n');
 
-    task[nr_tasks] = np;
+    PCB[nr_tasks] = np;
     // used to return pid
     int i = nr_tasks++;
     unlock();
@@ -153,42 +153,48 @@ void process_schedule(void){
     int i;
     task_struct_t *prev;
     task_struct_t *next = 0;
-    uart_puts("Process schedule\n");
+    //uart_puts("Process schedule\n");
     lock();
     prev = current_task;
     for(i = 0; i < NR_TASKS; i++){
-        if(task[i] && task[i]->status == TASK_WAITING){
-            uart_puts("Current task: ");
+        if(PCB[i] && PCB[i]->status == TASK_WAITING){
+            /*uart_puts("Current task: ");
             uart_itoa(current_task->status);
             uart_putc(' ');
             uart_puts("New task: ");
             uart_itoa(task[i]->status);
-            uart_putc('\n');
+            uart_putc('\n');*/
             if(current_task->status != TASK_ZOMBIE)
                 current_task->status = TASK_WAITING;
-            task[i]->status = TASK_RUNNING;
-            next = task[i];
+            PCB[i]->status = TASK_RUNNING;
+            next = PCB[i];
+            if(i == 0)
+                continue;
             break;
         }
     }
     if(current_task == next || next == 0){
+        /*uart_b2x_64((my_uint64_t)current_task);
+        uart_putc(' ');
+        uart_b2x_64((my_uint64_t)next);
+        uart_putc('\n');
         uart_puts("No task to schedule\n");
-        delay(1000000);
+        delay(1000000);*/
         unlock();
         return;
     }
-
-    uart_itoa(prev->pid);
+    
+    /*uart_itoa(prev->pid);
     uart_puts(" ");
     uart_itoa(next->pid);
     uart_putc(' ');
     uart_b2x_64(next->context.x19);
     uart_putc(' ');
     uart_b2x_64(next->context.lr);
-    uart_putc('\n');
+    uart_putc('\n');*/
 
     current_task = next;
-    switch_to(get_current(), &next->context);
+    switch_to(get_current(), &(next->context));
     /*my_uint64_t x19;
     uart_puts("Current x19:");
     asm volatile(
@@ -213,7 +219,7 @@ void exit_process(void){
 
 void idle_process(void){
     while(1){
-        uart_puts("Idle process\n");
+        //uart_puts("Idle process\n");
         process_schedule();
     }
 }
@@ -234,8 +240,8 @@ void kernel_procsss(void){
     uart_b2x_64((my_uint64_t)elr);
     uart_putc('\n');
     
-    //int err = to_el0((my_uint64_t)&user_process2);
-    int err = to_el0((my_uint64_t)&fork_test);
+    int err = to_el0((my_uint64_t)&user_process2);
+    //int err = to_el0((my_uint64_t)&fork_test);
     if(err < 0)
         uart_puts("Error while moving to user mode\n");
     
@@ -275,10 +281,13 @@ void user_process2(void){
     uart_puts("\r\n");
 
     uart_puts("-------------------------\n");
+    call_uart_write("Process start, pid is: ", 24);
+    //call_uart_write(call_get_pid(), 1);
+
     char async_buf[50];
     int ticks = 150;
 
-    call_uart_write("Enter a string: ", 16);
+    call_uart_write("# Enter a string: ", 16);
     while(ticks--);
 
     int received = call_uart_read(async_buf, 5);
@@ -372,26 +381,37 @@ void fork_test(void){
 void schedule_timer(void *nouse){
      unsigned long long cntfrq_el0;
     __asm__ __volatile__("mrs %0, cntfrq_el0\n\t": "=r"(cntfrq_el0)); //tick frequency
-    add_timer(schedule_timer, (void*)"", cntfrq_el0 >> 5);
+    if(add_timer_NA(schedule_timer, cntfrq_el0 >> 5) == 0)
+        uart_puts("Failed to add timer\n");
 }
-
+char *file_data;
 void file_process(my_uint64_t file_addr){
     uart_puts("File process\n");
     uart_b2x_64(file_addr);
+    uart_putc(' ');
+    uart_itoa(cpio_file_size);
     uart_putc('\n');
-    to_el0((my_uint64_t)file_addr);
+    // char *temp;
+    // uart_get_fn(temp);
 
-    uint64_t tmp;
-    boot_timer_flag = 2;
+    file_data = (char*)pool_alloc(cpio_file_size);
 
-   
-    
-    asm volatile("mrs %0, cntkctl_el1" : "=r"(tmp));
-    tmp |= 1;
-    asm volatile("msr cntkctl_el1, %0" : : "r"(tmp));
+    for(int i = 0; i < cpio_file_size; i++)
+        file_data[i] = ((char*)file_addr)[i];
+    //memcpy(file_data, (char*)file_addr, 0x3D000);
+
+    to_el0((my_uint64_t)file_data);
+    asm volatile(
+        "msr tpidr_el1, %[var1];"
+        :
+        : [var1] "r" (&current_task->context)
+    );
+
+    boot_timer_flag = 2;   
 
     mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
-    add_timer(schedule_timer, (void*)"", 1);
+    if(add_timer_NA(schedule_timer, 100000000) == 0)
+        uart_puts("Failed to add timer\n");
 
     //call_exit();
 }

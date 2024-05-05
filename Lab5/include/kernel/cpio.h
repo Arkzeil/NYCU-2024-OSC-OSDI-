@@ -7,6 +7,8 @@
 #define RPI_CPIO  0x20000000
 // a global variable that's defined somwhere else(somewhere include cpio.h)
 extern char *cpio_addr;
+extern char *cpio_end;
+extern unsigned int cpio_file_size;
 // ref:https://man.freebsd.org/cgi/man.cgi?query=cpio&sektion=5
 // Each  file  system  object  in a	cpio archive comprises a header	record
 // with basic numeric metadata followed by the full	pathname of the	 entry

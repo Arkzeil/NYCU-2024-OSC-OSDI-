@@ -41,3 +41,6 @@ run:
 
 debug:
 	qemu-system-aarch64 -M raspi3b -kernel kernel8.img -initrd initramfs.cpio -dtb bcm2710-rpi-3-b-plus.dtb -serial null -serial stdio -S -s
+
+dump:
+	aarch64-linux-gnu-objdump -d kernel8.elf

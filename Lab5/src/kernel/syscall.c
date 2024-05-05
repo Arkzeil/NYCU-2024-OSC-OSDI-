@@ -3,33 +3,34 @@
 trap_frame_t *current_tf;
 
 int getpid(){
-    uart_puts("getpid: ");
-    uart_itoa(current_task->pid);
-    uart_puts("\n");
+    // uart_puts("getpid: ");
+    // uart_itoa(current_task->pid);
+    // uart_puts("\n");
     current_tf->x0 = current_task->pid; 
     return current_task->pid;
 }
 
-unsigned int uart_read(char buf[], unsigned int size){
+unsigned int uart_read(char buf[], my_uint64_t size){
     int i;
-    unlock();
+    //unlock();
+    //lock();
     // no overflow protection
     for(i = 0; i < size; i++){
         //buf[i] = uart_getc();
         buf[i] = (char)uart_irq_getc();
     }
-
+    //unlock();
     current_tf->x0 = i;
     return i;
 }
 
-unsigned int uart_write(char buf[], unsigned int size){
+unsigned int uart_write(const char buf[], my_uint64_t size){
     int i;
     
     // no overflow protection
     for(i = 0; i < size; i++){
-        //uart_putc(buf[i]);
-        uart_irq_putc(buf[i]);
+        uart_putc(buf[i]);
+        //uart_irq_putc(buf[i]);
     }
 
     current_tf->x0 = i;
@@ -95,28 +96,32 @@ int mbox_call(unsigned char ch, unsigned int *mbox){
             return mbox[1] == REQUEST_SUCCEED;
         }
     }
-
-    unlock();
     // failed to get from mailbox(should not reach here)
     current_tf->x0 = 0;
+    unlock();
     return 0;
 }
 
 void kill(int pid){
+    lock();
     if(pid < 0 || pid >= NR_TASKS){
         uart_puts("Invalid PID\n");
+        unlock();
         return;
     }
 
     if(pid == current_task->pid){
         uart_puts("Cannot kill current task\n");
+        unlock();
         return;
     }
     
-    if(task[pid] != 0){
-        task[pid]->status = TASK_ZOMBIE;
+    if(PCB[pid] != 0){
+        PCB[pid]->status = TASK_ZOMBIE;
+        unlock();
         return;
     }
+    unlock();
     // PID not found
     uart_puts("PID not found\n");
 }
