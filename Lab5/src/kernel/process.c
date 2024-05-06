@@ -13,14 +13,14 @@ void gdb(){
 int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_uint64_t stack){
     lock();
     // allocate a new task struct and trap frame for new process
-    task_struct_t *np = (task_struct_t *)pool_alloc(THREAD_STK_SIZE);
+    task_struct_t *np = (task_struct_t *)pool_alloc(sizeof(task_struct_t));
     // holds the complete register state of a process or thread at a specific point in time, usually when a system call, interrupt, or exception occurs.
     // this is used for load_all as load_all will load from sp
     //np->tf = (trap_frame_t *)pool_alloc(THREAD_STK_SIZE);
     //trap_frame_t  *tf = (trap_frame_t *)pool_alloc(sizeof(trap_frame_t));
     //show_mem_stat();
     //np->sp = (my_uint64_t)pool_alloc(THREAD_STK_SIZE);
-    trap_frame_t *tf = get_task_tf(np);
+    //trap_frame_t *tf = get_task_tf(np);
 
     if(!np){
         unlock();

@@ -46,6 +46,18 @@ call_kill:
 	svc #0
 	ret
 
+.global call_sigreg
+call_sigreg:
+	mov w8, #8
+	svc #0
+	ret
+
+.global call_sigkill
+call_sigkill:
+	mov w8, #9
+	svc #0
+	ret
+
 // load general registers from stack
 .macro load_all
     ldp x0, x1, [sp ,16 * 0]

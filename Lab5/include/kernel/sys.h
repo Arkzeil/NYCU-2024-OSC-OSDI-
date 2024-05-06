@@ -11,6 +11,9 @@ int call_fork();
 void call_exit();
 int call_mbox(unsigned char ch, unsigned int *mbox);
 void call_kill(int pid);
+void call_sigreg(int SIGNAL, void (*handler)());
+void call_sigkill(int pid, int SIGNAL);
+
 int call_sys_clone(unsigned long long fn, unsigned long arg, unsigned long long stack);
 
 #endif

@@ -125,3 +125,22 @@ void kill(int pid){
     // PID not found
     uart_puts("PID not found\n");
 }
+
+void sigreg(int SIGNAL, void (*handler)()){
+    if(SIGNAL < 0 || SIGNAL >= NR_SIGNALS){
+        uart_puts("Invalid SIGNAL REG\n");
+        return;
+    }
+    lock();
+    //current_task->signal_handler[SIGNAL] = handler;
+    unlock();
+}
+void sigkill(int pid, int SIGNAL){
+    if(pid < 0 || pid >= NR_TASKS || PCB[pid] == 0 || PCB[pid]->status == TASK_ZOMBIE){
+        uart_puts("Invalid PID\n");
+        return;
+    }
+    lock();
+
+    unlock();
+}

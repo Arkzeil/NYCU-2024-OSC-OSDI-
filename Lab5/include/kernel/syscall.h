@@ -10,6 +10,7 @@
 #include "kernel/process.h"
 
 extern trap_frame_t *current_tf;
+#define NR_SIGNALS 64
 
 int getpid();
 // read user input from uart into buf
@@ -21,5 +22,8 @@ int fork(my_uint64_t stack);
 void exit();
 int mbox_call(unsigned char ch, unsigned int *mbox);
 void kill(int pid);
+
+void sigreg(int SIGNAL, void (*handler)());
+void sigkill(int pid, int SIGNAL);
 
 #endif

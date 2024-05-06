@@ -15,6 +15,9 @@
 #define TASK_WAITING 2
 #define TASK_ZOMBIE -1
 #define PF_KTHREAD   2
+#define NR_SIGNALS 64
+
+typedef void (*signal_handler_t)(void);
 
 // calee saved registers
 typedef struct process_context{
@@ -41,7 +44,15 @@ typedef struct task_struct{
     int status;
     int pid;
     int flag;
-    int space[925];
+    // signal
+    /* Signal */
+    signal_handler_t signal_handler[NR_SIGNALS + 1];
+    int sigcount[NR_SIGNALS + 1];
+    signal_handler_t cur_signal_handler;
+    int signal_is_checking;
+    process_context_t signal_saved_context;
+
+    //int space[697];
     trap_frame_t tf;
 }task_struct_t;
 

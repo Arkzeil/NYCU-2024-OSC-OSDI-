@@ -93,6 +93,14 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
             uart_b2x_64((unsigned long long)syscall_num);
             kill((int)current_tf->x0);
             break;
+        case 8:
+            uart_b2x_64((unsigned long long)syscall_num);
+            sigreg((int)current_tf->x0, (void (*)())current_tf->x1);
+            break;
+        case 9:
+            uart_b2x_64((unsigned long long)syscall_num);
+            sigkill((int)current_tf->x0, (int)current_tf->x1);
+            break;
         default:
             uart_puts("Unknown system call number: ");
             uart_b2x_64(syscall_num);
