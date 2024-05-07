@@ -110,15 +110,16 @@ void kill(int pid){
         return;
     }
 
-    if(pid == current_task->pid){
+    /*if(pid == current_task->pid){
         uart_puts("Cannot kill current task\n");
         unlock();
         return;
-    }
+    }*/
     
     if(PCB[pid] != 0){
         PCB[pid]->status = TASK_ZOMBIE;
         unlock();
+        process_schedule();
         return;
     }
     unlock();
@@ -132,15 +133,35 @@ void sigreg(int SIGNAL, void (*handler)()){
         return;
     }
     lock();
-    //current_task->signal_handler[SIGNAL] = handler;
+    current_task->signal_handler[SIGNAL] = handler;
     unlock();
 }
+
 void sigkill(int pid, int SIGNAL){
     if(pid < 0 || pid >= NR_TASKS || PCB[pid] == 0 || PCB[pid]->status == TASK_ZOMBIE){
         uart_puts("Invalid PID\n");
         return;
     }
     lock();
-
+    // send a signal to the process
+    uart_itoa(pid);
+    uart_putc(' ');
+    uart_itoa(SIGNAL);
+    PCB[pid]->sigcount[SIGNAL]++;
     unlock();
+}
+
+void sigret(void){
+    uint64_t sig_stk;
+    // if it's not using any stack space
+    if(current_tf->sp_el0 % THREAD_STK_SIZE == 0)
+        sig_stk = current_tf->sp_el0 - THREAD_STK_SIZE;
+    // else make it aligned to the stack size
+    else
+        sig_stk = current_tf->sp_el0 & ~(THREAD_STK_SIZE - 1);
+
+    pool_free((void*)sig_stk);
+    
+    // restore the context of the process
+    load_context(&current_task->signal_saved_context);
 }

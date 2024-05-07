@@ -164,7 +164,9 @@ core_timer_handler:
 
 general_irq_handler:
   save_all
+  mov x0, sp
   bl c_general_irq_handler
+  //bl check_signal
   load_all
   eret
 
@@ -179,6 +181,7 @@ system_call_handler:
   mov x0, sp              // get trap frame(which is the same thing we just saved, meaning that we might modified user space registers)
   bl c_system_call_handler
   str x0, [sp, 0]         // save return value to trap frame
+  //bl check_signal         // check if there is any signal
   load_all
   eret
 

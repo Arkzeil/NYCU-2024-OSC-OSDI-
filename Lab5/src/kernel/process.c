@@ -36,6 +36,12 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
     if(clone_flags & PF_KTHREAD){
         np->context.x19 = fn;
         np->context.x20 = arg;
+        
+        np->signal_is_checking = 0;
+        for(int i = 0; i <= NR_SIGNALS; i++){
+            np->signal_handler[i] = signal_default_handler;  // set all signal handler to default
+            np->sigcount[i] = 0;        // set all signal count to 0
+        }
     }
     // if it's user thread, we just copy the trap frame from current task
     else{
@@ -95,6 +101,12 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
         for(int i = 0; i < THREAD_STK_SIZE; i++){
             *((char*)np->sp + i) = *((char*)current_task->sp + i);
         }
+
+        np->signal_is_checking = 0;
+        for(int i = 0; i <= NR_SIGNALS; i++){
+            np->signal_handler[i] = current_task->signal_handler[i];  // set all signal handler to default
+            np->sigcount[i] = 0;        // set all signal count to 0
+        }
         //return 0;
     }
     uart_puts("context x19: ");
@@ -120,7 +132,7 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
     uart_puts("pid:");
     uart_itoa(np->pid);
     uart_putc('\n');
-
+    // this will replace init_pcb when first idle process created
     PCB[nr_tasks] = np;
     // used to return pid
     int i = nr_tasks++;

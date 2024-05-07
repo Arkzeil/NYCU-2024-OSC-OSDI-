@@ -9,6 +9,7 @@
 #include "kernel/type.h"
 #include "kernel/sys.h"
 #include "kernel/timer.h"
+#include "kernel/signal.h"
 
 #define NR_TASKS 64
 #define TASK_RUNNING 1
@@ -45,14 +46,13 @@ typedef struct task_struct{
     int pid;
     int flag;
     // signal
-    /* Signal */
     signal_handler_t signal_handler[NR_SIGNALS + 1];
     int sigcount[NR_SIGNALS + 1];
     signal_handler_t cur_signal_handler;
     int signal_is_checking;
     process_context_t signal_saved_context;
 
-    //int space[697];
+    int space[697];
     trap_frame_t tf;
 }task_struct_t;
 
@@ -60,7 +60,7 @@ extern task_struct_t *current_task;
 extern task_struct_t *PCB[NR_TASKS];
 extern int nr_tasks;
 // this is the task of kernel shell
-#define INIT_TASK { {0,0,0,0,0,0,0,0,0,0,0,0,0}, 0, TASK_RUNNING, -1, PF_KTHREAD, {0}, {0}}
+#define INIT_TASK { {0,0,0,0,0,0,0,0,0,0,0,0,0}, 0, TASK_RUNNING, -1, PF_KTHREAD, {0}, {0}, 0, 0, {0}, {0} }
 
 extern void ret_from_fork(void);
 int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_uint64_t stack);

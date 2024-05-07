@@ -10,6 +10,7 @@
 #include "kernel/process.h"
 
 extern trap_frame_t *current_tf;
+extern void load_context(void *context);
 #define NR_SIGNALS 64
 
 int getpid();
@@ -25,5 +26,6 @@ void kill(int pid);
 
 void sigreg(int SIGNAL, void (*handler)());
 void sigkill(int pid, int SIGNAL);
+void sigret(void);
 
 #endif

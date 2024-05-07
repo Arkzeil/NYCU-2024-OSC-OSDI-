@@ -319,7 +319,7 @@ void c_timer_handler(){
     );
 }
 
-void c_general_irq_handler(){
+void c_general_irq_handler(trap_frame_t *tf){
     unsigned int cpu_irq_src, gpu_irq_src;
     unsigned long long el;
 
@@ -403,6 +403,10 @@ void c_general_irq_handler(){
             task_create_DF0(c_timer_handler, 0);
             prep_task();
         }
+    }
+    if((tf->spsr_el1 & 0b1100) == 0){
+        //uart_puts("EL0\n");
+        check_signal(tf);
     }
     // Save the current state
     /*asm volatile(
