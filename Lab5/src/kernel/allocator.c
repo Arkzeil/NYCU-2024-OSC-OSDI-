@@ -635,27 +635,27 @@ void startup_init(void){
     uart_puts("Pool init starting\n");
     pool_init();
     uart_puts("Startup init starting\n");
-    show_mem_stat();
+    //show_mem_stat();
     //memory_reserve((void*)0x10000000, (void*)buddy->list_addr[MAX_ORDER - 1] + sizeof(buddy_block_list_t));
     //show_mem_stat();
     // reserve Spin tables for multicore boot
     memory_reserve((void*)0x0, (void*)0x1000);
-    show_mem_stat();
+    //show_mem_stat();
     memory_reserve((void*)0x1000, (void*)0x80000);
-    show_mem_stat();
+    //show_mem_stat();
     // reserve Kernel image in the physical memory
     memory_reserve((void*)&_start, (void*)&__end);
-    show_mem_stat();
+    //show_mem_stat();
     // reserve the CPIO archive in the physical memory
     memory_reserve((void*)cpio_addr, (void*)cpio_end);
-    show_mem_stat();
+    //show_mem_stat();
     // reserve the device tree blob in the physical memory
     memory_reserve((void*)_dtb_addr, (void*)_dtb_addr + 0x30000);
-    show_mem_stat();
+    //show_mem_stat();
     // reserve allocator metadata in the physical memory
     memory_reserve((void*)BUDDY_METADATA_ADDR, (void*)BUDDY_METADATA_ADDR + sizeof(buddy_system_t) + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));
-    show_mem_stat();
+    //show_mem_stat();
     // reserve the pool metadata in the physical memory
     memory_reserve((void*)&__end, (void*)allocated + 0x100000);
-    show_mem_stat();
+    //show_mem_stat();
 }

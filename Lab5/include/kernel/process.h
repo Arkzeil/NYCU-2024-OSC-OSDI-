@@ -51,7 +51,7 @@ typedef struct task_struct{
     signal_handler_t cur_signal_handler;
     int signal_is_checking;
     process_context_t signal_saved_context;
-
+    // if this is not added, the signal handler might be corrupted. Still looking for reason
     int space[697];
     trap_frame_t tf;
 }task_struct_t;

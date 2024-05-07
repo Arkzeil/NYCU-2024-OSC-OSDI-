@@ -1,8 +1,8 @@
 // switch_to(prev, next), as x0 is parameter register 1(prev), and x1 is parameter register 2(next)
 // tpidr_el1 stores the per_cpu offset of current CPU, Provides a location where software executing at EL1 can store thread identifying information
 // about which registers need to save: https://developer.arm.com/documentation/102374/0101/Procedure-Call-Standard
-.global switch_to
 // usually we write all callee-saved registers into current tpidr_el1, then load all callee-saved registers from x1 and set tpidr_el1 to x1
+.global switch_to
 switch_to:
     stp x19, x20, [x0, 16 * 0]
     stp x21, x22, [x0, 16 * 1]

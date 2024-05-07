@@ -206,6 +206,9 @@ void process_schedule(void){
     uart_putc('\n');*/
 
     current_task = next;
+    delay(150);
+    // uart_b2x_64(get_current());
+    // uart_putc('\n');
     switch_to(get_current(), &(next->context));
     /*my_uint64_t x19;
     uart_puts("Current x19:");
@@ -216,6 +219,7 @@ void process_schedule(void){
     );
     uart_b2x_64(x19);
     uart_putc('\n');*/
+    // uart_puts("Switched\n");
     unlock();
 }
 
@@ -231,7 +235,7 @@ void exit_process(void){
 
 void idle_process(void){
     while(1){
-        //uart_puts("Idle process\n");
+        uart_puts("Idle process\n");
         process_schedule();
     }
 }

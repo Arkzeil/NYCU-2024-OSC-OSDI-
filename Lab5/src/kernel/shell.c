@@ -15,6 +15,10 @@ void my_shell(){
         argv[buf_index] = simple_malloc(MAX_ARGV_LEN);
 
     copy_process(PF_KTHREAD, (my_uint64_t)&idle_process, 0, 0);
+    current_task = PCB[0];
+    // tpidr_el1 hold a thread id
+    asm volatile("msr tpidr_el1, %0" ::"r" (&(current_task->context))); /// malloc a space for current kernel thread to prevent crash
+    
 
     while(1){
         buf_index = 0;
@@ -337,7 +341,7 @@ void my_shell(){
                 uart_puts("Create process failed\n");
                 continue;
             }
-            
+            // uart_puts("Start schedule\n");
             process_schedule();
         }
         else{
