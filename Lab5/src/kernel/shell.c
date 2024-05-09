@@ -263,6 +263,7 @@ void my_shell(){
             for(; i < 5; i++)
                 thread_create(foo, 0);
             // start scheduling
+            asm volatile("msr tpidr_el1, %0" ::"r" (pool_alloc(sizeof(thread_t))));
             idle_task();
         }
         else if(!string_comp(buf, "test")){

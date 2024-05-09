@@ -208,8 +208,7 @@ int uart_get_fn(char *buf){
             //uart_puts("\nwarning: Get non ASCII code\n");
             continue;
         }
-        uart_putc(input_char);
-
+        
         if(buf_index < MAX_BUF_LEN)
             buf[buf_index++] = parse(input_char);
         // should replace with parsed char

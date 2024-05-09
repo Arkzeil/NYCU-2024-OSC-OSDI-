@@ -31,7 +31,7 @@ thread_t* thread_create(void *fn, void *arg){
     if(new_thread == 0)
         return 0;
     uart_b2x_64(sizeof(thread_context_t));
-    memzero(&new_thread->context, sizeof(struct thread_context));
+    memzero((my_uint64_t)&new_thread->context, sizeof(struct thread_context));
     
     new_thread->data = arg;
     new_thread->pid = allocated_pid++;
@@ -93,8 +93,8 @@ void schedule(void){
     }
     
     cur_thread->status = 1; // running
-    uart_puts("Switch to thread: ");
-    uart_itoa(cur_thread->pid);
+    //uart_puts("Switch to thread: ");
+    //uart_itoa(cur_thread->pid);
 
     switch_to(get_current(), &cur_thread->context);
 
@@ -102,11 +102,11 @@ void schedule(void){
 }
 
 void idle_task(void){
-    static int i = 0;
-    while(i < 6){
+    //static int i = 0;
+    while(1){
         kill_zombies();
         schedule();
-        i++;
+        //i++;
     }
 }
 // reclaim threads marked as zombie. In this exercise, all threads are consider the child of idle thread
