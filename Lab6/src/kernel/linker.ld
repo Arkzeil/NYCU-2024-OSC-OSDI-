@@ -10,7 +10,7 @@ SECTIONS
   /* C stack should start at address 0x80000 and grow downwards, since hardware loads our kernel to address 0x80000 and up, stack can safely run from 0x80000 and down*/
   /* 0x80000 is for aarch64, 0x8000 for 32 bits*/
   /* 0x80000 is our where our .text start*/
-  . = 0x80000;
+  /*. = 0x80000;*/
 
   . = 0xffff000000000000; /* kernel space*/
   . += 0x80000;           /*kernel load address*/
@@ -67,6 +67,12 @@ SECTIONS
     *(.comment)
   }
   __end = .;
+
+  . = 0xffff00002c000000;
+  _stack_end = .;
+  . = 0xffff00003c000000;
+  _stack_top = .;
+  
   /*PROVIDE(__end = .);*/
 }
 /*calculate .bss by byte*/

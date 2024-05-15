@@ -1,9 +1,10 @@
 // A53 document:https://developer.arm.com/documentation/ddi0500/j/System-Control/AArch32-register-descriptions/Multiprocessor-Affinity-Register?lang=en
 // where this code belongs(.text section) in the compiled binary.
 #include "kernel/mmu.h"
+#define CORE0_TIMER_IRQ_CTRL 0x40000040
+
 .section ".text.boot"
 // 
-#define CORE0_TIMER_IRQ_CTRL 0x40000040
 // Make _start global.
 .global _start
 
@@ -27,41 +28,38 @@ halt:
 
   // if it's cpu0
 1:  
-  // store the address of _dtb_addr
-  // then load the dtb loading address(x0) into x1(_dtb_addr)
-  ldr x1, =_dtb_addr
-  str x0, [x1]
   // branch and link. change from EL2 to EL1 before any initialization start(this should after the device tree address is obtained as it will change x0)
   bl from_el2_to_el1
 
 set_mmu:
-  ldr x0, = TCR_CONFIG_DEFAULT
-  msr tcr_el1, x0
+  ldr x4, = TCR_CONFIG_DEFAULT
+  msr tcr_el1, x4
 
-  ldr x0, =( (MAIR_DEVICE_nGnRnE << (MAIR_IDX_DEVICE_nGnRnE * 8)) | (MAIR_NORMAL_NOCACHE << (MAIR_IDX_NORMAL_NOCACHE * 8)) )
-  msr mair_el1, x0
+  ldr x4, =( (MAIR_DEVICE_nGnRnE << (MAIR_IDX_DEVICE_nGnRnE * 8)) | (MAIR_NORMAL_NOCACHE << (MAIR_IDX_NORMAL_NOCACHE * 8)) )
+  msr mair_el1, x4
 
-  mov x0, 0 // PGD's page frame at 0x0
-  mov x1, 0x1000 // PUD's page frame at 0x1000
-
+  mov x4, MMU_PGD_ADDR  // PGD's page frame at 0x0
+  mov x1, MMU_PUD_ADDR  // PUD's page frame at 0x1000
+  // configure the first entry of PGD
   ldr x2, = BOOT_PGD_ATTR
-  orr x2, x1, x2 // combine the physical address of next level page with attribute.
-  str x2, [x0]
-
+  orr x2, x1, x2        // combine the physical address of next level page with attribute.
+  str x2, [x4]          // 1st PUD table mapped by the 1st entry of PGD
+  // configure the first and second entry of PUD
   ldr x2, = BOOT_PUD_ATTR
   mov x3, 0x00000000
   orr x3, x2, x3
-  str x3, [x1] // 1st 1GB mapped by the 1st entry of PUD
-  mov x3, 0x40000000
+  str x3, [x1]          // 1st 1GB mapped by the 1st entry of PUD
+  mov x3, 0x40000000    // 2^30 = 1GB
   orr x3, x2, x3
-  str x3, [x1, 8] // 2nd 1GB mapped by the 2nd entry of PUD
+  str x3, [x1, 8]       // 2nd 1GB mapped by the 2nd entry of PUD
 
-  msr ttbr0_el1, x0 // load PGD to the bottom translation-based register. This is for user space.(Holds the base address of the translation table for the initial lookup for stage 1 of the translation of an address from the lower VA range in the EL1&0 translation regime)
-  msr ttbr1_el1, x0 // also load PGD to the upper translation based register. This is for kernel space
+  msr ttbr0_el1, x4     // load PGD to the bottom translation-based register. This is for user space.(Holds the base address of the translation table for the initial lookup for stage 1 of the translation of an address from the lower VA range in the EL1&0 translation regime)
+  msr ttbr1_el1, x4     // also load PGD to the upper translation based register. This is for kernel space
 
   // Set stack pointer before code starts
   //ldr x1, =_start
-  mov sp, 0x3c000000 // set stack pointer to 0x3c000000
+  mov sp, 0x3c000000 // set temp stack pointer to 0x3c000000
+  bl set_2M_kernel_mmu
 
   mrs x2, sctlr_el1
   orr x2 , x2, 1
@@ -71,9 +69,13 @@ set_mmu:
   br x2
 
 set_exception_vector_table:
-  adr x0, exception_vector_table  // save relative address(PC) of exception_vector_table to x0
-  msr vbar_el1, x0                // Vector Base Address Register: Holds the vector base address for any exception that is taken to EL1.
+  adr x1, exception_vector_table  // save relative address(PC) of exception_vector_table to x0
+  msr vbar_el1, x1                // Vector Base Address Register: Holds the vector base address for any exception that is taken to EL1.
 
+set_mmu_stack:
+  // set top of stack at 0xffff00003c000000 (last usable memory)
+  ldr x3, =_stack_top
+  mov sp, x3
   // clear bss
   // load bss start location to x1(64bit register)
   ldr x1, =__bss_start
@@ -92,6 +94,10 @@ set_exception_vector_table:
   cbnz w2, 2b
 
 3:
+  // store the address of _dtb_addr
+  // then load the dtb loading address(x0) into x1(_dtb_addr)
+  ldr x1, =_dtb_addr
+  str x0, [x1]
   bl core_timer_enable
   // jump to C code, will not return in normal scenario
   bl main
@@ -99,11 +105,11 @@ set_exception_vector_table:
   b  halt
 
 from_el2_to_el1:
-  mov x0, (1 << 31) // EL1 uses aarch64
-  msr hcr_el2, x0   // hcr: hypervisior configuration register. bit[31] is set indicate that the Execution state for EL1 is AArch64
+  mov x1, (1 << 31) // EL1 uses aarch64
+  msr hcr_el2, x1   // hcr: hypervisior configuration register. bit[31] is set indicate that the Execution state for EL1 is AArch64
   // 3C5->345 as unmask bit 7(IRQ mask), s.t. el1 IRQ interrupt is enabled
-  mov x0, 0x345     // EL1h (SPSel = 1) with interrupt disabled.   spsel, which consists of a single bit that controls whether sp is an alias of sp_el1 or sp_el0
-  msr spsr_el2, x0  // spsr: saved program state register   cpsr: current program state register
+  mov x1, 0x345     // EL1h (SPSel = 1) with interrupt disabled.   spsel, which consists of a single bit that controls whether sp is an alias of sp_el1 or sp_el0
+  msr spsr_el2, x1  // spsr: saved program state register   cpsr: current program state register
   msr elr_el2, lr   // Saved the current return address into elr_el2(exception link register, only for aarch64, used for returning to PC after exception)
   eret              // return to EL1. eret: reconstruct the processor state from current exception level's spsr_elx register and branch to the address in elr_elx
 

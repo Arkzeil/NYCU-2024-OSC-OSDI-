@@ -26,6 +26,10 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
         unlock();
         return -1;
     }
+    // initialize the vma of new task struct
+    INIT_LIST_HEAD(&(np->vma_list));
+    np->context.pgd = pool_alloc(4096);
+    memzero((my_uint64_t)np->context.pgd, 4096);
 
     // zero out the process context and trap frame
     // memzero should pass the address of the first byte of the struct
@@ -104,9 +108,27 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
 
         np->signal_is_checking = 0;
         for(int i = 0; i <= NR_SIGNALS; i++){
-            np->signal_handler[i] = current_task->signal_handler[i];  // set all signal handler to default
+            np->signal_handler[i] = current_task->signal_handler[i];  // copy signal handler
             np->sigcount[i] = 0;        // set all signal count to 0
         }
+
+        // copy the vma list of the parent process
+        list_head_t *pos;
+        vm_area_struct_t *vma;
+        list_for_each(pos, &current_task->vma_list){
+            // ignore device and signal wrapper
+            vma = (vm_area_struct_t *)pos;
+            if (vma->virt_addr == USER_SIGNAL_WRAPPER_VA || vma->virt_addr == PERIPHERAL_START)
+                continue;
+            
+            char *new_alloc = pool_alloc(vma->area_size);
+            mmu_add_vma(np, vma->virt_addr, vma->area_size, (my_uint64_t)VIRT_TO_PHYS(new_alloc), vma->rwx, 1);
+            memcpy(new_alloc, (void*)PHYS_TO_VIRT(vma->phys_addr), vma->area_size);
+        }
+        // reserve periphiaral space
+        mmu_add_vma(np, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
+        // reserve user signal wrapper space
+        mmu_add_vma(np, USER_SIGNAL_WRAPPER_VA, (my_uint64_t)VIRT_TO_PHYS(signal_handler_wrapper), 0x2000, 0b101, 0);
         //return 0;
     }
     uart_puts("context x19: ");

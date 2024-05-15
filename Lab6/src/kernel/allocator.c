@@ -238,7 +238,7 @@ int get_next_avail(int order){
     return -1;
 }
 // get block index by using address
-int get_index(void *addr){
+my_uint64_t get_index(void *addr){
     return (addr - buddy_mem_start) / PAGE_SIZE;
 }
 // get block metadata address by using index
@@ -401,7 +401,7 @@ void* buddy_malloc(unsigned int size){
 }
 
 void buddy_free(void *addr){
-    int block_index = get_index(addr);
+    int block_index = (int)get_index(addr);
     buddy_block_list_t *cur_block = get_block(block_index);
     int order = simple_log(cur_block->size / PAGE_SIZE, 2);
     int buddy_index = find_buddy(block_index, order);
@@ -528,7 +528,7 @@ void *pool_alloc(unsigned int size) {
         uart_puts("Allocated memory pool size: ");
         uart_itoa(pool_sizes[pool_idx]);
         uart_puts(" at page frame index: ");
-        uart_itoa(get_index(page));
+        uart_itoa((int)get_index(page));
         uart_putc('\n');
     }
 
@@ -571,11 +571,11 @@ void pool_free(void *ptr){
 void memory_reserve(void* start,void* end){
     if(start < (void*)BUDDY_START || end > (void*)BUDDY_END){
         uart_puts("Error: The memory is out of range\n");
-        return;
+        //return;
     }
 
-    int start_index = get_index(start);
-    int end_index = get_index(end);
+    my_uint64_t start_index = get_index(start);
+    my_uint64_t end_index = get_index(end);
     if((my_uint64_t)end % PAGE_SIZE != 0)
         end_index++;
     int i;
@@ -639,18 +639,18 @@ void startup_init(void){
     //memory_reserve((void*)0x10000000, (void*)buddy->list_addr[MAX_ORDER - 1] + sizeof(buddy_block_list_t));
     //show_mem_stat();
     // reserve Spin tables for multicore boot
-    memory_reserve((void*)0x0, (void*)0x1000);
+    memory_reserve((void*)PHYS_TO_VIRT(0x0), (void*)PHYS_TO_VIRT(0x1000));
     //show_mem_stat();
-    memory_reserve((void*)0x1000, (void*)0x80000);
+    memory_reserve((void*)PHYS_TO_VIRT(MMU_PGD_ADDR), (void*)PHYS_TO_VIRT(MMU_PTE_ADDR + 0x2000));
     //show_mem_stat();
     // reserve Kernel image in the physical memory
     memory_reserve((void*)&_kernel_start, (void*)&__end);
     //show_mem_stat();
     // reserve the CPIO archive in the physical memory
-    memory_reserve((void*)cpio_addr, (void*)cpio_end);
+    memory_reserve((void*)PHYS_TO_VIRT(cpio_addr), (void*)PHYS_TO_VIRT(cpio_end));
     //show_mem_stat();
     // reserve the device tree blob in the physical memory
-    memory_reserve((void*)_dtb_addr, (void*)_dtb_addr + 0x30000);
+    memory_reserve((void*)PHYS_TO_VIRT(_dtb_addr), (void*)PHYS_TO_VIRT(_dtb_addr + 0x30000));
     //show_mem_stat();
     // reserve allocator metadata in the physical memory
     memory_reserve((void*)BUDDY_METADATA_ADDR, (void*)BUDDY_METADATA_ADDR + sizeof(buddy_system_t) + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));

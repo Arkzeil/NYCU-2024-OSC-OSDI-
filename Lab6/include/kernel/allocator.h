@@ -5,13 +5,14 @@
 #include "kernel/uart.h"
 #include "kernel/dtb.h"
 #include "kernel/cpio.h"
+#include "kernel/mmu.h"
 
 #define MAX_HEAP_SIZE       4194304
 #define PAGE_SIZE           4096
-#define BUDDY_START         0x0
-#define BUDDY_END           0x3C000000
+#define BUDDY_START         PHYS_TO_VIRT(0x0)
+#define BUDDY_END           PHYS_TO_VIRT(0x3C000000)
 #define MAX_ORDER           19          // 0x3c000000/0x1000 = 0x3c000 = 245760 = 2^17 + 2^16 + 2^15 + 2^14, so the maximum order is 18(0~18)
-#define BUDDY_METADATA_ADDR 0x10000000
+#define BUDDY_METADATA_ADDR PHYS_TO_VIRT(0x10000000)
 // the number of memory pools
 #define NUM_POOLS   6
 #define MIN_POOL_SIZE 16

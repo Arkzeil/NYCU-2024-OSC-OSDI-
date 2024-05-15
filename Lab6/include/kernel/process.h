@@ -10,6 +10,7 @@
 #include "kernel/sys.h"
 #include "kernel/timer.h"
 #include "kernel/signal.h"
+#include "kernel/list.h"
 
 #define NR_TASKS 64
 #define TASK_RUNNING 1
@@ -35,6 +36,7 @@ typedef struct process_context{
     my_uint64_t fp;   //x29, pointed to the bottom of the stack, which is the value of the stack pointer just before the function was called(should be immutable).
     my_uint64_t lr;   //x30, but it's refered as PC in some implementation
     my_uint64_t sp;
+    void *pgd;
 }process_context_t;
 
 // this struct must match the format we defined in save_all and load_all
@@ -51,8 +53,10 @@ typedef struct task_struct{
     signal_handler_t cur_signal_handler;
     int signal_is_checking;
     process_context_t signal_saved_context;
+    // Add VMA list
+    list_head_t vma_list;
     // if this is not added, the signal handler might be corrupted. Still looking for reason
-    int space[697];
+    int space[690];
     trap_frame_t tf;
 }task_struct_t;
 
