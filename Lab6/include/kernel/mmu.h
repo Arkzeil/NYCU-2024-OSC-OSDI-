@@ -36,6 +36,8 @@
 #define PERIPHERAL_START        0x3c000000
 #define PERIPHERAL_END          0x3f000000
 
+#define USER_KERNEL_BASE        0x000000000000
+#define USER_STACK_BASE         0xfffffffff000
 #define USER_SIGNAL_WRAPPER_VA  0xffffffff9000
 
 #ifndef __ASSEMBLER__

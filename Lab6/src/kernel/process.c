@@ -46,6 +46,12 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
             np->signal_handler[i] = signal_default_handler;  // set all signal handler to default
             np->sigcount[i] = 0;        // set all signal count to 0
         }
+
+        mmu_add_vma(np, (void*)(USER_STACK_BASE - THREAD_STK_SIZE), (void*)VIRT_TO_PHYS(np->sp), 0x1000, 0b011, 0);
+        // reserve periphiaral space
+        mmu_add_vma(np, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
+        // reserve user signal wrapper space
+        mmu_add_vma(np, USER_SIGNAL_WRAPPER_VA, (my_uint64_t)VIRT_TO_PHYS(signal_handler_wrapper), 0x2000, 0b101, 0);
     }
     // if it's user thread, we just copy the trap frame from current task
     else{
