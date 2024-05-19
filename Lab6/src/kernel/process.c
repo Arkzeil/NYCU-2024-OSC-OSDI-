@@ -26,15 +26,16 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
         unlock();
         return -1;
     }
-    // initialize the vma of new task struct
-    INIT_LIST_HEAD(&(np->vma_list));
-    np->context.pgd = pool_alloc(4096);
-    memzero((my_uint64_t)np->context.pgd, 4096);
 
     // zero out the process context and trap frame
     // memzero should pass the address of the first byte of the struct
     memzero((my_uint64_t)&(np->context), sizeof(process_context_t));
     memzero((my_uint64_t)&np->tf, sizeof(trap_frame_t));
+
+    // initialize the vma of new task struct
+    INIT_LIST_HEAD(&(np->vma_list));
+    np->context.pgd = pool_alloc(4096);
+    memzero((my_uint64_t)np->context.pgd, 4096);
 
     // if it's kernel thread, we should set the function and argument
     if(clone_flags & PF_KTHREAD){
@@ -47,11 +48,6 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
             np->sigcount[i] = 0;        // set all signal count to 0
         }
 
-        mmu_add_vma(np, (void*)(USER_STACK_BASE - THREAD_STK_SIZE), (void*)VIRT_TO_PHYS(np->sp), 0x1000, 0b011, 0);
-        // reserve periphiaral space
-        mmu_add_vma(np, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
-        // reserve user signal wrapper space
-        mmu_add_vma(np, USER_SIGNAL_WRAPPER_VA, (my_uint64_t)VIRT_TO_PHYS(signal_handler_wrapper), 0x2000, 0b101, 0);
     }
     // if it's user thread, we just copy the trap frame from current task
     else{
@@ -154,9 +150,12 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
     // use the space between metadata and trap frame as stack
     np->context.sp = (my_uint64_t)&(np->tf);
     np->context.lr = (my_uint64_t)ret_from_fork;
-    uart_puts("context lr: ");
-    uart_b2x_64(np->context.lr);
+    uart_b2x_64((my_uint64_t)np->context.pgd);
     uart_putc('\n');
+
+    // uart_puts("context lr: ");
+    // uart_b2x_64(np->context.lr);
+    // uart_putc('\n');
     uart_puts("pid:");
     uart_itoa(np->pid);
     uart_putc('\n');
@@ -191,11 +190,11 @@ int to_el0(my_uint64_t fn){
 
 void process_schedule(void){
     int i;
-    //task_struct_t *prev;
+    task_struct_t *prev;
     task_struct_t *next = 0;
     //uart_puts("Process schedule\n");
     lock();
-    //prev = current_task;
+    prev = current_task;
     int temp;
     for(i = 0; i < NR_TASKS; i++){
         // to iterate the pid larger than current task, round back if not found
@@ -205,7 +204,7 @@ void process_schedule(void){
             uart_itoa(current_task->status);
             uart_putc(' ');
             uart_puts("New task: ");
-            uart_itoa(task[i]->status);
+            uart_itoa(PCB[i]->status);
             uart_putc('\n');*/
             if(temp == 0)
                 continue;
@@ -228,14 +227,14 @@ void process_schedule(void){
         }
     }
     
-    /*uart_itoa(prev->pid);
+    uart_itoa(prev->pid);
     uart_puts(" ");
     uart_itoa(next->pid);
     uart_putc(' ');
     uart_b2x_64(next->context.x19);
     uart_putc(' ');
     uart_b2x_64(next->context.lr);
-    uart_putc('\n');*/
+    uart_putc('\n');
 
     current_task = next;
     delay(150);
@@ -271,6 +270,8 @@ void kill_zombie_process(void){
     lock();
     for(int i = 0; i < NR_TASKS; i++){
         if(PCB[i] && PCB[i]->status == TASK_ZOMBIE){
+            mmu_free_page_tables(PCB[i]->context.pgd, 0);
+            mmu_del_vma(PCB[i]);
             pool_free((void*)PCB[i]->sp);
             pool_free((void*)PCB[i]);
             PCB[i] = 0;
@@ -441,10 +442,10 @@ void fork_test(void){
     }
 }
 
-void schedule_timer(void *nouse){
+void process_schedule_timer(void *nouse){
     unsigned long long cntfrq_el0;
     __asm__ __volatile__("mrs %0, cntfrq_el0\n\t": "=r"(cntfrq_el0)); //tick frequency
-    if(add_timer_NA(schedule_timer, cntfrq_el0 >> 5) == 0)
+    if(add_timer_NA(process_schedule_timer, cntfrq_el0 >> 5) == 0)
         uart_puts("Failed to add timer\n");
 }
 char *file_data;
@@ -464,6 +465,22 @@ void file_process(my_uint64_t file_addr){
     //memcpy(file_data, (char*)file_addr, 0x3D000);
 
     to_el0((my_uint64_t)file_data);
+
+    mmu_add_vma(current_task, USER_KERNEL_BASE, VIRT_TO_PHYS(file_data), cpio_file_size, 0b111, 0);    
+    mmu_add_vma(current_task, (USER_STACK_BASE - THREAD_STK_SIZE), VIRT_TO_PHYS(current_task->sp), 0x1000, 0b111, 0);
+    // reserve periphiaral space
+    mmu_add_vma(current_task, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
+    // reserve user signal wrapper space
+    mmu_add_vma(current_task, USER_SIGNAL_WRAPPER_VA, (my_uint64_t)VIRT_TO_PHYS(signal_handler_wrapper), 0x2000, 0b101, 0);
+
+    current_task->context.pgd = VIRT_TO_PHYS(current_task->context.pgd);
+    current_task->context.sp = USER_STACK_BASE;
+    current_task->context.fp = USER_STACK_BASE;
+    current_task->context.lr = USER_KERNEL_BASE;       
+    current_task->tf.elr_el1 = current_task->context.lr; 
+    current_task->tf.sp_el0 = current_task->context.sp;
+    current_task->tf.fp = current_task->context.fp;
+
     asm volatile(
         "msr tpidr_el1, %[var1];"
         :
@@ -473,8 +490,22 @@ void file_process(my_uint64_t file_addr){
     boot_timer_flag = 2;   
 
     mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
-    if(add_timer_NA(schedule_timer, 100000000) == 0)
+    if(add_timer_NA(process_schedule_timer, 100000000) == 0)
         uart_puts("Failed to add timer\n");
+
+    uart_puts("PGD: ");
+    asm volatile(
+        "dsb ish\r\n"
+        "msr ttbr0_el1, %[var1]\r\n"
+        "tlbi vmalle1\r\n"
+        "dsb ish\r\n"
+        "isb\r\n"
+        :
+        : [var1] "r" (current_task->context.pgd)
+    );
+    
+    uart_b2x_64((my_uint64_t)current_task->context.pgd);
+    uart_putc('\n');
 
     //call_exit();
 }

@@ -38,8 +38,8 @@ set_mmu:
   ldr x4, =( (MAIR_DEVICE_nGnRnE << (MAIR_IDX_DEVICE_nGnRnE * 8)) | (MAIR_NORMAL_NOCACHE << (MAIR_IDX_NORMAL_NOCACHE * 8)) )
   msr mair_el1, x4
 
-  mov x4, MMU_PGD_ADDR  // PGD's page frame at 0x0
-  mov x1, MMU_PUD_ADDR  // PUD's page frame at 0x1000
+  ldr x4, = MMU_PGD_ADDR  // PGD's page frame at 0x0
+  ldr x1, = MMU_PUD_ADDR  // PUD's page frame at 0x1000
   // configure the first entry of PGD
   ldr x2, = BOOT_PGD_ATTR
   orr x2, x1, x2        // combine the physical address of next level page with attribute.

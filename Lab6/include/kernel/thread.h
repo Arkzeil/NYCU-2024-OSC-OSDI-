@@ -7,60 +7,67 @@
 #include "kernel/utils.h"
 #include "kernel/syscall.h"
 #include "kernel/mem.h"
+#include "kernel/memory.h"
 
-#define THREAD_STK_SIZE 4096
-// calee saved registers
-typedef struct thread_context{
-    unsigned long long x19;
-    unsigned long long x20;
-    unsigned long long x21;
-    unsigned long long x22;
-    unsigned long long x23;
-    unsigned long long x24;
-    unsigned long long x25;
-    unsigned long long x26;
-    unsigned long long x27;
-    unsigned long long x28;
-    unsigned long long fp;   //x29, pointed to the bottom of the stack, which is the value of the stack pointer just before the function was called(should be immutable).
-    unsigned long long lr;   //x30, but it's refered as PC in some implementation
-    unsigned long long sp;
-}thread_context_t;
-
-
-// I considered using list like https://github.com/torvalds/linux/blob/master/include/linux/list.h, but it's actually rely on 'container_of' to get corresponding struct address.
-// which is quite complex to implement(Another way is to put that list struct in the first element of thread struct so you can get right address using 'next'). 
-// But it's actually not a better solution. So I will use simple linked list instead.
-
-typedef struct thread{
-    thread_context_t context;
-    char *sp;               // make it char in order to access it byte by byte during fork
-    struct thread *next;
-    struct thread *prev;
-    char *data;
-    int data_size;
-    int status;             // 1 for running, 0 for waiting, -1 for zombie
-    int pid;
-}thread_t;
-
-
-
-extern thread_t *cur_thread;
-extern thread_t *run_queue;
-extern thread_t *wait_queue;
+#define PIDMAX      32768
+#define USTACK_SIZE 0x4000
+#define KSTACK_SIZE 0x4000
+#define SIGNAL_MAX  64
 
 extern void switch_to(void *prev, void *next);
 extern void* get_current();
 extern void fork_return(void);
 extern void to_user(void);
 
-void thread_init(void);
-thread_t* thread_create(void *fn, void *arg);
-void thread_yield(void);
-void thread_exit(void);
-void kill_zombies(void);
-void schedule(void);
+typedef struct thread_context
+{
+    unsigned long x19;
+    unsigned long x20;
+    unsigned long x21;
+    unsigned long x22;
+    unsigned long x23;
+    unsigned long x24;
+    unsigned long x25;
+    unsigned long x26;
+    unsigned long x27;
+    unsigned long x28;
+    unsigned long fp;
+    unsigned long lr;
+    unsigned long sp;
+    void* pgd;   // use for MMU mapping (user space)
+} thread_context_t;
 
-void idle_task(void);
-void foo(void);
+typedef struct thread
+{
+    list_head_t      listhead;
+    thread_context_t context;
+    char*            data;
+    unsigned int     datasize;
+    int              iszombie;
+    int              pid;
+    int              isused;
+    char*            stack_alloced_ptr;
+    char*            kernel_stack_alloced_ptr;
+    void             (*signal_handler[SIGNAL_MAX+1])();
+    int              sigcount[SIGNAL_MAX + 1];
+    void             (*curr_signal_handler)();
+    int              signal_is_checking;
+    thread_context_t signal_saved_context;
+    list_head_t      vma_list;
+} thread_t;
+
+extern thread_t    *curr_thread;
+extern list_head_t *run_queue;
+extern list_head_t *wait_queue;
+extern thread_t    threads[PIDMAX + 1];
+
+void      schedule_timer(char *notuse);
+void      init_thread_sched();
+void      idle();
+void      schedule();
+void      kill_zombies();
+void      thread_exit();
+thread_t *thread_create(void *start, unsigned int filesize);
+int       thread_exec(char *data, unsigned int filesize);
 
 #endif

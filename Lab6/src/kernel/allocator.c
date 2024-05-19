@@ -657,5 +657,6 @@ void startup_init(void){
     //show_mem_stat();
     // reserve the pool metadata in the physical memory
     memory_reserve((void*)&__end, (void*)allocated + 0x100000);
+    memory_reserve(&_stack_end, &_stack_top);
     //show_mem_stat();
 }

@@ -45,14 +45,14 @@ int exec(const char* name, char *const argv[]){
     if(file_addr == 0)
         return 0;
 
-    cur_thread->data_size = cpio_get_size((char*)name);
-    cur_thread->data = (char*)pool_alloc(cur_thread->data_size);
+    curr_thread->datasize = cpio_get_size((char*)name);
+    curr_thread->data = (char*)pool_alloc(curr_thread->datasize);
     
     for(int i = 0; i < cpio_get_size((char*)name); i++)
-        cur_thread->data[i] = file_addr[i];
+        curr_thread->data[i] = file_addr[i];
     
-    current_tf->elr_el1 = (unsigned long)cur_thread->data;
-    current_tf->sp_el0 = (unsigned long)cur_thread->context.sp;
+    current_tf->elr_el1 = (unsigned long)curr_thread->data;
+    current_tf->sp_el0 = (unsigned long)curr_thread->context.sp;
     
     current_tf->x0 = 0;
     return 0;
@@ -65,7 +65,7 @@ int fork(my_uint64_t stack){
 // this will never return
 void exit(){
     // lock();
-    // cur_thread->status = -1; // indicate that this thread is zombie(dead, in this lab)
+    // curr_thread->status = -1; // indicate that this thread is zombie(dead, in this lab)
     // unlock();
     // schedule();
     exit_process();

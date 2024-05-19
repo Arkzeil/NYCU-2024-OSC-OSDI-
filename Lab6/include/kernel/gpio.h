@@ -1,12 +1,14 @@
 #ifndef GPIO_H
 #define GPIO_H
 
+#include "kernel/mmu.h"
+
 // peripheral offset of the GPIO and the UART hardware systems, as well as some of their registers.
 
 // The GPIO registers base address.
 // Check BCM2835 section 1.2.3 
 // Check p.90 of BCM2837 doc
-#define MMIO_BASE   0x3F000000 // 0x3F200000 for raspi2 & 3, 0x20200000 for raspi1
+#define MMIO_BASE   PHYS_TO_VIRT(0x3F000000) // 0x3F200000 for raspi2 & 3, 0x20200000 for raspi1
 // GPIO Function Select n
 #define GPFSEL0     ((volatile unsigned int*)(MMIO_BASE + 0x00200000))
 #define GPFSEL1     ((volatile unsigned int*)(MMIO_BASE + 0x00200004))

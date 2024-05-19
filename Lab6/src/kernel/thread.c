@@ -1,140 +1,160 @@
 #include "kernel/thread.h"
 
-thread_t *cur_thread;
-thread_t *run_queue;
-thread_t *wait_queue;
+thread_t *curr_thread;
+list_head_t *run_queue;
+list_head_t *wait_queue;
+thread_t threads[PIDMAX + 1];
 
-void thread_init(void){
+void init_thread_sched()
+{
     lock();
+    run_queue = kmalloc(sizeof(list_head_t));
+    wait_queue = kmalloc(sizeof(list_head_t));
+    INIT_LIST_HEAD(run_queue);
+    INIT_LIST_HEAD(wait_queue);
 
-    cur_thread = 0;
-    run_queue = 0;
-    wait_queue = 0;
+    //init pids
+    for (int i = 0; i <= PIDMAX; i++)
+    {
+        threads[i].isused = 0;
+        threads[i].pid = i;
+        threads[i].iszombie = 0;
+    }
 
-    // tpidr:Thread Pointer Identifier Register
-    // Allocate a space that can hold a Thread Control Block(TCB)
-    asm volatile(
-        "msr tpidr_el1, %[var1];"
-        :
-        :[var1] "r" (pool_alloc(sizeof(thread_t)))
-    );
-    
-    cur_thread = thread_create(idle_task, 0);
+    thread_t* idlethread = thread_create(idle,0x1000);
+    curr_thread = idlethread;
+    asm volatile("msr tpidr_el1, %0" ::"r" (&idlethread->context));
     unlock();
 }
 
-thread_t* thread_create(void *fn, void *arg){
-    // record the pid that already allocated(no matter that thread is alive or not)
-    static int allocated_pid = 0;
-
-    thread_t *new_thread = (thread_t*)pool_alloc(2048);
-    if(new_thread == 0)
-        return 0;
-    uart_b2x_64(sizeof(thread_context_t));
-    memzero((my_uint64_t)&new_thread->context, sizeof(struct thread_context));
-    
-    new_thread->data = arg;
-    new_thread->pid = allocated_pid++;
-    new_thread->next = 0;
-    new_thread->prev = 0;
-    new_thread->status = 0; // consider this thread is waiting
-    
-    new_thread->sp = (void*)(pool_alloc(THREAD_STK_SIZE));
-    // set stack pointer to the end of this process's stack
-    // But won't this corrupt other memory regions? -> Well... it's stack, so it is growing downward, which means it won't corrupt other memory regions.
-    new_thread->context.sp = (unsigned long)new_thread->sp + THREAD_STK_SIZE;
-    // set the frame pointer to the value of the stack pointer just before the function was called
-    new_thread->context.fp = new_thread->context.sp;
-    // store function in link register, which will be executed after return from 'switch_to' 
-    new_thread->context.lr = (unsigned long)fn;
-    
-    if(new_thread->sp == 0){
-        pool_free(new_thread);
-        return 0;
+void idle(){
+    while(1)
+    {
+        kill_zombies();   //reclaim threads marked as DEAD
+        schedule();       //switch to next thread in run queue
     }
+}
 
+void schedule(){
     lock();
-
-    if(run_queue == 0) // if no thread is running, make this thread as running thread
-        run_queue = new_thread;
-    else{               // else put this thread to the end of run queue
-        thread_t *current = run_queue;
-        while(current->next != 0)
-            current = current->next;
-        current->next = new_thread;
-        new_thread->prev = current;
-    }
-
+    do{
+        curr_thread = (thread_t *)curr_thread->listhead.next;
+    } while (list_is_head(&curr_thread->listhead, run_queue) || curr_thread->iszombie);
     unlock();
-
-    return new_thread;
+    switch_to(get_current(), &curr_thread->context);
 }
 
-void schedule(void){
-    if(run_queue == 0){
-        uart_puts("No thread can be schedule(only idle)\n");
-        return;
-    }
-
+void kill_zombies(){
     lock();
-    // if no thread is running(which is unlikely as there's an idle thread), make the first thread in run queue as running thread
-    if(cur_thread == 0){
-        uart_puts("No thread is running\n");
-        cur_thread = run_queue;
-    }
-    else if(cur_thread->next != 0 && cur_thread->next->status != -1) // not zombie
-        cur_thread = cur_thread->next;
-    // make it circular
-    else if(cur_thread->next == 0 && run_queue->status != -1)
-        cur_thread = run_queue;
-    else if(cur_thread->next == 0 && run_queue->status == -1){
-        uart_puts("No thread can be schedule(only idle)\n");
-        return;
-    }
-    
-    cur_thread->status = 1; // running
-    //uart_puts("Switch to thread: ");
-    //uart_itoa(cur_thread->pid);
-
-    switch_to(get_current(), &cur_thread->context);
-
-    unlock();
-}
-
-void idle_task(void){
-    //static int i = 0;
-    while(1){
-        kill_zombies();
-        schedule();
-        //i++;
-    }
-}
-// reclaim threads marked as zombie. In this exercise, all threads are consider the child of idle thread
-void kill_zombies(void){
-    thread_t *current = run_queue;
-    while(current != 0){
-        if(current->status == -1){
-            thread_t *tmp = current;
-            uart_puts("Zombie killed: ");
-            uart_itoa(tmp->pid);
-            uart_putc('\n');
-            current = current->next;
-            pool_free(tmp->sp);
-            pool_free(tmp);
+    list_head_t *curr;
+    thread_t *t;
+    list_for_each(curr,run_queue)
+    {
+        t = (thread_t *)curr;
+        if (t->iszombie)
+        {
+            list_del_entry(curr);
+            mmu_free_page_tables(t->context.pgd,0);
+            mmu_del_vma(t);
+            kfree(t->kernel_stack_alloced_ptr);
+            kfree(PHYS_TO_VIRT(t->context.pgd));
+            t->iszombie = 0;
+            t->isused   = 0;
         }
-        else
-            current = current->next;
     }
+    unlock();
 }
 
-void foo(void){
-    for(int i = 0; i < 10; ++i) {
-        uart_puts("Thread id: ");
-        uart_itoa(cur_thread->pid);
-        uart_putc(' ');
-        uart_itoa(i);
-        uart_putc('\n');
-        delay(1000000);
-        schedule();
+int thread_exec(char *data, unsigned int filesize)
+{
+    thread_t *t = thread_create(data, filesize);
+
+    mmu_add_vma(t,              USER_KERNEL_BASE,                       t->datasize,   (size_t)VIRT_TO_PHYS(t->data)             , 0b111, 1);
+    mmu_add_vma(t, USER_STACK_BASE - USTACK_SIZE,                       USTACK_SIZE,   (size_t)VIRT_TO_PHYS(t->stack_alloced_ptr), 0b111, 1);
+    mmu_add_vma(t,              PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START,                             PERIPHERAL_START, 0b011, 0);
+    mmu_add_vma(t,        USER_SIGNAL_WRAPPER_VA,                            0x2000, (size_t)VIRT_TO_PHYS(signal_handler_wrapper), 0b101, 0);
+
+    t->context.pgd = VIRT_TO_PHYS(t->context.pgd);
+    t->context.sp = USER_STACK_BASE;
+    t->context.fp = USER_STACK_BASE;
+    t->context.lr = USER_KERNEL_BASE;
+
+    //copy file into data
+    for (int i = 0; i < filesize;i++)
+    {
+        t->data[i] = data[i];
     }
+
+    //disable echo when going to userspace
+    curr_thread = t;
+    add_timer_NA(schedule_timer, 100000000);
+    // eret to exception level 0
+    asm("msr tpidr_el1, %0\n\t"
+        "msr elr_el1, %1\n\t"
+        "msr spsr_el1, xzr\n\t" // enable interrupt in EL0. You can do it by setting spsr_el1 to 0 before returning to EL0.
+        "msr sp_el0, %2\n\t"
+        "mov sp, %3\n\t"
+        "dsb ish\n\t"        // ensure write has completed
+        "msr ttbr0_el1, %4\n\t"
+        "tlbi vmalle1is\n\t" // invalidate all TLB entries
+        "dsb ish\n\t"        // ensure completion of TLB invalidatation
+        "isb\n\t"            // clear pipeline"
+        "eret\n\t" ::"r"(&t->context),"r"(t->context.lr), "r"(t->context.sp), "r"(t->kernel_stack_alloced_ptr + KSTACK_SIZE), "r"(t->context.pgd));
+
+    return 0;
+}
+
+
+//malloc a kstack and a userstack
+thread_t *thread_create(void *start, unsigned int filesize)
+{
+    lock();
+
+    thread_t *r;
+    for (int i = 0; i <= PIDMAX; i++)
+    {
+        if (!threads[i].isused)
+        {
+            r = &threads[i];
+            break;
+        }
+    }
+    INIT_LIST_HEAD(&r->vma_list);
+    r->iszombie = 0;
+    r->isused = 1;
+    r->context.lr = (unsigned long long)start;
+    r->stack_alloced_ptr = kmalloc(USTACK_SIZE);
+    r->kernel_stack_alloced_ptr = kmalloc(KSTACK_SIZE);
+    r->signal_is_checking = 0;
+    r->data = kmalloc(filesize);
+    r->datasize = filesize;
+    r->context.sp = (unsigned long long)r->kernel_stack_alloced_ptr + KSTACK_SIZE;
+    r->context.fp = r->context.sp;
+
+    r->context.pgd = kmalloc(0x1000);
+    memzero(r->context.pgd, 0x1000);
+
+    //initial signal handler with signal_default_handler (kill thread)
+    for (int i = 0; i < SIGNAL_MAX; i++)
+    {
+        r->signal_handler[i] = signal_default_handler;
+        r->sigcount[i] = 0;
+    }
+
+    list_add(&r->listhead, run_queue);
+    unlock();
+    return r;
+}
+
+void thread_exit(){
+    lock();
+    curr_thread->iszombie = 1;
+    unlock();
+    schedule();
+}
+
+void schedule_timer(char* notuse){
+    unsigned long long cntfrq_el0;
+    __asm__ __volatile__("mrs %0, cntfrq_el0\n\t": "=r"(cntfrq_el0)); //tick frequency
+    add_timer_NA(schedule_timer, cntfrq_el0 >> 5);
 }

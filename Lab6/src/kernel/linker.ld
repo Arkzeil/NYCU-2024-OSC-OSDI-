@@ -31,6 +31,7 @@ SECTIONS
     /* Here, we put '.text input section' of all input files in it, as '*' will match all files ends with .text*/
     *(.text .text.* .gnu.linkonce.t*)
   }
+  . = ALIGN(0x00001000);
   /*PROVIDE(__text_end = .);
 
   PROVIDE(__rodata_start = .);*/
@@ -66,7 +67,10 @@ SECTIONS
   /DISCARD/ : {
     *(.comment)
   }
+  . = ALIGN(0x00001000);
   __end = .;
+  _kernel_end = .;
+  _heap_start = .;
 
   . = 0xffff00002c000000;
   _stack_end = .;

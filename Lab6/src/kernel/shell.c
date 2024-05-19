@@ -256,7 +256,7 @@ void my_shell(){
             pool_free(pool_alloc(1025));
             uart_puts("-----------------\n");
         }
-        else if(!string_comp(buf, "thread")){
+        /*else if(!string_comp(buf, "thread")){
             int i = 0;
             thread_init();
 
@@ -265,7 +265,7 @@ void my_shell(){
             // start scheduling
             asm volatile("msr tpidr_el1, %0" ::"r" (pool_alloc(sizeof(thread_t))));
             idle_task();
-        }
+        }*/
         else if(!string_comp(buf, "test")){
             test_NI = h2i(argv[0], string_len(argv[0]));
 
@@ -286,11 +286,11 @@ void my_shell(){
             uart_irq_off();
             test_NI = 0;
         }
-        else if(!string_comp(buf, "syscall")){
+        /*else if(!string_comp(buf, "syscall")){
             thread_init();
             thread_create(fork_test, 0);
             idle_task();
-        }
+        }*/
         else if(!string_comp(buf, "process")){
             int_on();
             uart_irq_on();
@@ -342,8 +342,35 @@ void my_shell(){
                 uart_puts("Create process failed\n");
                 continue;
             }
-            // uart_puts("Start schedule\n");
+            uart_puts("Start schedule\n");
             process_schedule();
+        }
+        else if(!string_comp(buf, "exec")){
+            init_thread_sched();
+            void *file_addr;
+            int file_name_len;
+            char file_name[50];
+            uint64_t tmp; 
+
+            asm volatile("mrs %0, cntkctl_el1" : "=r"(tmp));
+            tmp |= 1;
+            asm volatile("msr cntkctl_el1, %0" : : "r"(tmp));
+
+            uart_puts("Program name: ");
+
+            file_name_len = uart_get_fn(file_name);
+            if(file_name_len >= 50)
+                uart_puts("Warning: buffer is full, command output may not correct\n");
+
+            file_addr = cpio_find(file_name);
+            // indicating that the file is either a directory or not exist
+            if(file_addr == 0)
+                continue;
+
+            int_on();
+            uart_irq_on();
+
+            thread_exec(file_addr, cpio_file_size);
         }
         else{
             uart_puts("Unknown Command: ");

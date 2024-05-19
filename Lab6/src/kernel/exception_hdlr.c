@@ -21,6 +21,14 @@ void int_on(void){
 }
 // x0 = tf
 int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
+    unsigned long long esr_el1;
+    __asm__ __volatile__("mrs %0, esr_el1\n\t": "=r"(esr_el1));
+    esr_el1_t *esr = (esr_el1_t *)&esr_el1;
+    if (esr->ec == MEMFAIL_DATA_ABORT_LOWER || esr->ec == MEMFAIL_INST_ABORT_LOWER){
+        mmu_memfail_abort_handle(esr);
+        return -1;
+    }
+
     int_on();
     /*uart_puts("Entering system call handler\n");
 
@@ -396,6 +404,7 @@ void c_general_irq_handler(trap_frame_t *tf){
             prep_task();
             mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
             process_schedule();
+            schedule();
         }
         else if(boot_timer_flag != 0){
             c_core_timer_handler();

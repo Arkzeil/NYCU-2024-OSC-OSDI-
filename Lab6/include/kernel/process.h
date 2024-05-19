@@ -18,6 +18,7 @@
 #define TASK_ZOMBIE -1
 #define PF_KTHREAD   2
 #define NR_SIGNALS 64
+#define THREAD_STK_SIZE 4096
 
 typedef void (*signal_handler_t)(void);
 
@@ -64,7 +65,7 @@ extern task_struct_t *current_task;
 extern task_struct_t *PCB[NR_TASKS];
 extern int nr_tasks;
 // this is the task of kernel shell
-#define INIT_TASK { {0,0,0,0,0,0,0,0,0,0,0,0,0}, 0, TASK_RUNNING, -1, PF_KTHREAD, {0}, {0}, 0, 0, {0}, {0} }
+#define INIT_TASK { {0,0,0,0,0,0,0,0,0,0,0,0,0,0}, 0, TASK_RUNNING, -1, PF_KTHREAD, {0}, {0}, 0, 0, {0}, {0}, {0}, {0} }
 
 extern void ret_from_fork(void);
 int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_uint64_t stack);

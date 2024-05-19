@@ -21,6 +21,8 @@
 extern char* __end;
 extern char* _start;
 extern char* _kernel_start;
+extern char* _stack_end;
+extern char* _stack_top;
 // make allocated variable global among all files
 extern char* allocated;
 extern int heap_offset;
