@@ -343,7 +343,7 @@ void my_shell(){
                 continue;
             }
             uart_puts("Start schedule\n");
-            process_schedule();
+            ini_process_schedule();
         }
         else if(!string_comp(buf, "exec")){
             init_thread_sched();

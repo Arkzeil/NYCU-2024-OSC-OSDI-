@@ -8,8 +8,8 @@ thread_t threads[PIDMAX + 1];
 void init_thread_sched()
 {
     lock();
-    run_queue = kmalloc(sizeof(list_head_t));
-    wait_queue = kmalloc(sizeof(list_head_t));
+    run_queue = pool_alloc(sizeof(list_head_t));
+    wait_queue = pool_alloc(sizeof(list_head_t));
     INIT_LIST_HEAD(run_queue);
     INIT_LIST_HEAD(wait_queue);
 
@@ -56,8 +56,8 @@ void kill_zombies(){
             list_del_entry(curr);
             mmu_free_page_tables(t->context.pgd,0);
             mmu_del_vma(t);
-            kfree(t->kernel_stack_alloced_ptr);
-            kfree(PHYS_TO_VIRT(t->context.pgd));
+            pool_free(t->kernel_stack_alloced_ptr);
+            pool_free(PHYS_TO_VIRT(t->context.pgd));
             t->iszombie = 0;
             t->isused   = 0;
         }
@@ -123,15 +123,15 @@ thread_t *thread_create(void *start, unsigned int filesize)
     r->iszombie = 0;
     r->isused = 1;
     r->context.lr = (unsigned long long)start;
-    r->stack_alloced_ptr = kmalloc(USTACK_SIZE);
-    r->kernel_stack_alloced_ptr = kmalloc(KSTACK_SIZE);
+    r->stack_alloced_ptr = pool_alloc(USTACK_SIZE);
+    r->kernel_stack_alloced_ptr = pool_alloc(KSTACK_SIZE);
     r->signal_is_checking = 0;
-    r->data = kmalloc(filesize);
+    r->data = pool_alloc(filesize);
     r->datasize = filesize;
     r->context.sp = (unsigned long long)r->kernel_stack_alloced_ptr + KSTACK_SIZE;
     r->context.fp = r->context.sp;
 
-    r->context.pgd = kmalloc(0x1000);
+    r->context.pgd = pool_alloc(0x1000);
     memzero(r->context.pgd, 0x1000);
 
     //initial signal handler with signal_default_handler (kill thread)

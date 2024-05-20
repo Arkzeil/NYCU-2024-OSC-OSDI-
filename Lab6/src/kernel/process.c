@@ -10,6 +10,15 @@ void gdb(){
 
 }
 
+char* _memcpy(void *dest, const void *src, unsigned long long len)
+{
+    char *d = dest;
+    const char *s = src;
+    while (len--)
+        *d++ = *s++;
+    return dest;
+}
+
 int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_uint64_t stack){
     lock();
     // allocate a new task struct and trap frame for new process
@@ -124,13 +133,21 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
                 continue;
             
             char *new_alloc = pool_alloc(vma->area_size);
-            mmu_add_vma(np, vma->virt_addr, vma->area_size, (my_uint64_t)VIRT_TO_PHYS(new_alloc), vma->rwx, 1);
-            memcpy(new_alloc, (void*)PHYS_TO_VIRT(vma->phys_addr), vma->area_size);
+            mmu_add_vma(np, vma->virt_addr, (my_uint64_t)VIRT_TO_PHYS(new_alloc), vma->area_size, vma->rwx, 1);
+            _memcpy(new_alloc, (void*)PHYS_TO_VIRT(vma->phys_addr), vma->area_size);
         }
         // reserve periphiaral space
         mmu_add_vma(np, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
         // reserve user signal wrapper space
         mmu_add_vma(np, USER_SIGNAL_WRAPPER_VA, (my_uint64_t)VIRT_TO_PHYS(signal_handler_wrapper), 0x2000, 0b101, 0);
+
+        np->context.pgd = VIRT_TO_PHYS(np->context.pgd);
+
+        /*asm volatile(
+            "msr ttbr0_el1, %[var1];"
+            :
+            : [var1] "r" (np->context.pgd)
+        );*/
         //return 0;
     }
     uart_puts("context x19: ");
@@ -150,8 +167,8 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
     // use the space between metadata and trap frame as stack
     np->context.sp = (my_uint64_t)&(np->tf);
     np->context.lr = (my_uint64_t)ret_from_fork;
-    uart_b2x_64((my_uint64_t)np->context.pgd);
-    uart_putc('\n');
+    // uart_b2x_64((my_uint64_t)np->context.pgd);
+    // uart_putc('\n');
 
     // uart_puts("context lr: ");
     // uart_b2x_64(np->context.lr);
@@ -186,6 +203,72 @@ int to_el0(my_uint64_t fn){
     current_task->sp = (my_uint64_t)stack;
     
     return 0;
+}
+
+void ini_process_schedule(void){
+    int i;
+    task_struct_t *prev;
+    task_struct_t *next = 0;
+    //uart_puts("Process schedule\n");
+    lock();
+    prev = current_task;
+    int temp;
+    for(i = 0; i < NR_TASKS; i++){
+        // to iterate the pid larger than current task, round back if not found
+        temp = (current_task->pid + i) % NR_TASKS;
+        if(PCB[temp] && PCB[temp]->status == TASK_WAITING){
+            /*uart_puts("Current task: ");
+            uart_itoa(current_task->status);
+            uart_putc(' ');
+            uart_puts("New task: ");
+            uart_itoa(PCB[i]->status);
+            uart_putc('\n');*/
+            if(temp == 0)
+                continue;
+            if(current_task->status != TASK_ZOMBIE)
+                current_task->status = TASK_WAITING;
+            PCB[temp]->status = TASK_RUNNING;
+            next = PCB[temp];
+            
+            break;
+        }
+    }
+    if(current_task == next || next == 0){
+        if(current_task->status != TASK_ZOMBIE){
+            unlock();
+            return;
+        }
+        else{
+            next = PCB[0];
+            next->status = TASK_RUNNING;
+        }
+    }
+    
+    uart_itoa(prev->pid);
+    uart_puts(" ");
+    uart_itoa(next->pid);
+    uart_putc(' ');
+    uart_b2x_64(next->context.x19);
+    uart_putc(' ');
+    uart_b2x_64(next->context.lr);
+    uart_putc('\n');
+
+    current_task = next;
+    delay(150);
+    // uart_b2x_64(get_current());
+    // uart_putc('\n');
+    ini_switch_to(get_current(), &(next->context));
+    /*my_uint64_t x19;
+    uart_puts("Current x19:");
+    asm volatile(
+        "mov %[var1], x19;"
+        : [var1] "=r" (x19)    // Output operands
+        :
+    );
+    uart_b2x_64(x19);
+    uart_putc('\n');*/
+    // uart_puts("Switched\n");
+    unlock();
 }
 
 void process_schedule(void){
@@ -466,8 +549,9 @@ void file_process(my_uint64_t file_addr){
 
     to_el0((my_uint64_t)file_data);
 
-    mmu_add_vma(current_task, USER_KERNEL_BASE, VIRT_TO_PHYS(file_data), cpio_file_size, 0b111, 0);    
-    mmu_add_vma(current_task, (USER_STACK_BASE - THREAD_STK_SIZE), VIRT_TO_PHYS(current_task->sp), 0x1000, 0b111, 0);
+    mmu_add_vma(current_task, USER_KERNEL_BASE, VIRT_TO_PHYS(file_data), cpio_file_size, 0b111, 0);
+    //mmu_add_vma(current_task, USER_KERNEL_BASE, VIRT_TO_PHYS(ret_from_fork), 0x1000, 0b111, 0);    
+    mmu_add_vma(current_task, (USER_STACK_BASE - THREAD_STK_SIZE), VIRT_TO_PHYS(current_task->tf.sp_el0), 0x1000, 0b111, 0);
     // reserve periphiaral space
     mmu_add_vma(current_task, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
     // reserve user signal wrapper space

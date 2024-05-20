@@ -2,6 +2,29 @@
 // tpidr_el1 stores the per_cpu offset of current CPU, Provides a location where software executing at EL1 can store thread identifying information
 // about which registers need to save: https://developer.arm.com/documentation/102374/0101/Procedure-Call-Standard
 // usually we write all callee-saved registers into current tpidr_el1, then load all callee-saved registers from x1 and set tpidr_el1 to x1
+.global ini_switch_to
+ini_switch_to:
+    stp x19, x20, [x0, 16 * 0]
+    stp x21, x22, [x0, 16 * 1]
+    stp x23, x24, [x0, 16 * 2]
+    stp x25, x26, [x0, 16 * 3]
+    stp x27, x28, [x0, 16 * 4]
+    stp fp, lr, [x0, 16 * 5]
+    mov x9, sp
+    str x9, [x0, 16 * 6]
+
+    ldp x19, x20, [x1, 16 * 0]
+    ldp x21, x22, [x1, 16 * 1]
+    ldp x23, x24, [x1, 16 * 2]
+    ldp x25, x26, [x1, 16 * 3]
+    ldp x27, x28, [x1, 16 * 4]
+    ldp fp, lr, [x1, 16 * 5]
+    ldp x9, x0, [x1, 16 * 6]
+    mov sp, x9
+    msr tpidr_el1, x1
+    
+    ret
+
 .global switch_to
 switch_to:
     stp x19, x20, [x0, 16 * 0]
@@ -20,11 +43,11 @@ switch_to:
     ldp x27, x28, [x1, 16 * 4]
     ldp fp, lr, [x1, 16 * 5]
     ldp x9, x0, [x1, 16 * 6]
-    mov sp,  x9
+    mov sp, x9
     msr tpidr_el1, x1
 
     dsb ish // ensure write has completed
-    //msr ttbr0_el1, x0 // switch translation based address.
+    msr ttbr0_el1, x0 // switch translation based address.
     tlbi vmalle1is // invalidate all TLB entries
     dsb ish // ensure completion of TLB invalidatation
     isb // clear pipeline

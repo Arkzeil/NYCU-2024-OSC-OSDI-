@@ -32,7 +32,6 @@ void *set_2M_kernel_mmu(void *x0){
 void map_one_page(my_uint64_t *pgd, my_uint64_t va, my_uint64_t pa, my_uint64_t attr){
     my_uint64_t *table = pgd; // pgd is the virtual address of the page table
     // PGD->PUD->PTE->PA
-    uart_puts("Mapping page: ");
     for(int i = 0; i < 4; i++){
         // get the index of the entry in the page table
         unsigned int idx = (va >> (39 - 9 * i)) & 0x1ff;

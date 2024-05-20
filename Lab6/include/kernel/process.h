@@ -71,6 +71,7 @@ extern void ret_from_fork(void);
 int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_uint64_t stack);
 int to_el0(my_uint64_t fn);
 
+void ini_process_schedule(void);
 void process_schedule(void);
 void exit_process(void);
 

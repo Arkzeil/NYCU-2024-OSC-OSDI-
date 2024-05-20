@@ -1,7 +1,7 @@
 // A53 document:https://developer.arm.com/documentation/ddi0500/j/System-Control/AArch32-register-descriptions/Multiprocessor-Affinity-Register?lang=en
 // where this code belongs(.text section) in the compiled binary.
 #include "kernel/mmu.h"
-#define CORE0_TIMER_IRQ_CTRL 0x40000040
+#define CORE0_TIMER_IRQ_CTRL PHYS_TO_VIRT(0x40000040)
 
 .section ".text.boot"
 // 

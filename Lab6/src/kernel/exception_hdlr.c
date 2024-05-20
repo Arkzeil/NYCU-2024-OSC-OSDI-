@@ -404,7 +404,7 @@ void c_general_irq_handler(trap_frame_t *tf){
             prep_task();
             mmio_write((long)CORE0_TIMER_IRQ_CTRL, 2);
             process_schedule();
-            schedule();
+            //schedule();
         }
         else if(boot_timer_flag != 0){
             c_core_timer_handler();
