@@ -140,6 +140,7 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
         mmu_add_vma(np, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
         // reserve user signal wrapper space
         mmu_add_vma(np, USER_SIGNAL_WRAPPER_VA, (my_uint64_t)VIRT_TO_PHYS(signal_handler_wrapper), 0x2000, 0b101, 0);
+        //mmu_add_vma(np, new_stack, (my_uint64_t)VIRT_TO_PHYS(np->tf.spsr_el1), THREAD_STK_SIZE, 01011, 1);
 
         np->context.pgd = VIRT_TO_PHYS(np->context.pgd);
 
@@ -551,7 +552,7 @@ void file_process(my_uint64_t file_addr){
 
     mmu_add_vma(current_task, USER_KERNEL_BASE, VIRT_TO_PHYS(file_data), cpio_file_size, 0b111, 0);
     //mmu_add_vma(current_task, USER_KERNEL_BASE, VIRT_TO_PHYS(ret_from_fork), 0x1000, 0b111, 0);    
-    mmu_add_vma(current_task, (USER_STACK_BASE - THREAD_STK_SIZE), VIRT_TO_PHYS(current_task->tf.sp_el0), 0x1000, 0b111, 0);
+    mmu_add_vma(current_task, (USER_STACK_BASE - THREAD_STK_SIZE), VIRT_TO_PHYS(current_task->sp), 0x1000, 0b111, 0);
     // reserve periphiaral space
     mmu_add_vma(current_task, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
     // reserve user signal wrapper space
@@ -564,6 +565,8 @@ void file_process(my_uint64_t file_addr){
     current_task->tf.elr_el1 = current_task->context.lr; 
     current_task->tf.sp_el0 = current_task->context.sp;
     current_task->tf.fp = current_task->context.fp;
+    // This leads to not scheduling the process?
+    current_task->sp = (USER_STACK_BASE - THREAD_STK_SIZE);
 
     asm volatile(
         "msr tpidr_el1, %[var1];"

@@ -34,6 +34,7 @@ switch_to:
     stp x27, x28, [x0, 16 * 4]
     stp fp, lr, [x0, 16 * 5]
     mov x9, sp
+    //mrs x0, ttbr0_el1
     str x9, [x0, 16 * 6]
 
     ldp x19, x20, [x1, 16 * 0]
