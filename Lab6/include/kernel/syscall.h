@@ -1,7 +1,6 @@
 #ifndef SYSCALL_H
 #define SYSCALL_H
 
-#include "kernel/syscall.h"
 #include "kernel/exception_hdlr.h"
 #include "kernel/thread.h"
 #include "kernel/uart.h"

@@ -9,7 +9,7 @@ void initramfs_callback(char *struct_addr, char *string_addr, unsigned int prop_
             uart_puts("CPIO address:");
             // Since address are 64bits, if we declare int32, there will be warning
             uint64_t addr = (uint64_t)BE2LE(*(uint32_t*)(temp));
-            uart_b2x(addr);
+            uart_b2x_64(addr);
             uart_putc('\n');
 
             cpio_addr = (char*)addr;

@@ -1,6 +1,7 @@
 #include "kernel/syscall.h"
 
 trap_frame_t *current_tf;
+volatile unsigned int  __attribute__((aligned(16))) pt[64];
 
 int getpid(){
     // uart_puts("getpid: ");
@@ -74,27 +75,46 @@ void exit(){
 int mbox_call(unsigned char ch, unsigned int *mbox){
     lock();
     
-    unsigned int mbox_ptr = ((unsigned int)((unsigned long)mbox) & ~0xF) | (ch & 0xF);
+    _memcpy((char*)pt, mbox, (unsigned int)mbox[0]);
+    
+    unsigned int mbox_ptr = ((unsigned int)((unsigned long)&pt) & ~0xF) | (ch & 0xF);
 
     // Wait until the mailbox is not full
-    while((mmio_read((long)MAILBOX_STATUS) & MAILBOX_FULL)){
+    while(*MAILBOX_STATUS & MAILBOX_FULL){
         asm volatile("nop");
     }
     // write our address containing message to mailbox address
-    mmio_write((long)MAILBOX_WRITE, mbox_ptr);
+    *MAILBOX_WRITE = mbox_ptr;
+    // uart_b2x_64(mbox_ptr);
+    // uart_putc(' ');
+    // uart_b2x_64(MAILBOX_WRITE);
+    // uart_putc('\n');
     // Wait for response
     while(1){
         // until the mailbox is not empty
-        while(mmio_read((long)MAILBOX_STATUS) & MAILBOX_EMPTY){
+        while(*MAILBOX_STATUS & MAILBOX_EMPTY){
             asm volatile("nop");
         }
+        delay(1000);
         // if it's the response corresponded to our request
-        if(mbox_ptr == mmio_read((long)MAILBOX_READ)){
+        if(mbox_ptr == *MAILBOX_READ){
             // if the response is successed
             current_tf->x0 = mailbox[1];
+            // uart_b2x_64(pt[1]);
+            // uart_putc(' ');
+            // uart_b2x_64(REQUEST_SUCCEED);
+            // uart_putc('\n');
             unlock();
-            return mbox[1] == REQUEST_SUCCEED;
+            return pt[1] == REQUEST_SUCCEED;
+            //return 1;
         }
+        // uart_b2x_64(mbox_ptr);
+        // uart_putc(' ');
+        // uart_b2x_64(MAILBOX_READ);
+        // uart_putc(' ');
+        // uart_b2x_64(*MAILBOX_READ);
+        // uart_putc('\n');
+        // delay(1000000);
     }
     // failed to get from mailbox(should not reach here)
     current_tf->x0 = 0;

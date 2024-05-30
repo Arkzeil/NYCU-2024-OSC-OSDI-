@@ -26,7 +26,7 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
     esr_el1_t *esr = (esr_el1_t *)&esr_el1;
     if (esr->ec == MEMFAIL_DATA_ABORT_LOWER || esr->ec == MEMFAIL_INST_ABORT_LOWER){
         mmu_memfail_abort_handle(esr);
-        return -1;
+        return 0;
     }
 
     int_on();
@@ -87,6 +87,7 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
             break;
         case 4:
             uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
             val = fork(args);
             break;
         case 5:
@@ -96,6 +97,9 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
         case 6:
             uart_b2x_64((unsigned long long)syscall_num);
             val = mbox_call((unsigned char)current_tf->x0, (unsigned int *)current_tf->x1);
+            uart_putc(' ');
+            uart_itoa(val);
+            uart_putc('\n');
             break;
         case 7:
             uart_b2x_64((unsigned long long)syscall_num);
@@ -119,7 +123,7 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
             uart_putc('\n');
             break;
     }
-
+    
     return val;
 
     // while(1)

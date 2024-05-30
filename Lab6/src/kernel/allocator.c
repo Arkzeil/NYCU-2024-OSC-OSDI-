@@ -379,10 +379,10 @@ void* buddy_malloc(unsigned int size){
                 // update the first available block
                 for(k = 0; k < MAX_ORDER; k++){
                     buddy->first_avail[k] = get_next_avail(k);
-                    uart_itoa(buddy->first_avail[k]);
-                    uart_putc(' ');
+                    //uart_itoa(buddy->first_avail[k]);
+                    //uart_putc(' ');
                 }
-                uart_putc('\n');
+                //uart_putc('\n');
 
                 uart_puts("Allocated block size:");
                 uart_itoa(buddy_allocated->size);
@@ -462,10 +462,10 @@ void buddy_free(void *addr){
     // update the first available block
     for(i = 0; i < MAX_ORDER; i++){
         buddy->first_avail[i] = get_next_avail(i);
-        uart_itoa(buddy->first_avail[i]);
-        uart_putc(' ');
+        // uart_itoa(buddy->first_avail[i]);
+        // uart_putc(' ');
     }
-    uart_putc('\n');
+    //uart_putc('\n');
 
     //show_buddy_system_stat();
 }
@@ -569,11 +569,7 @@ void pool_free(void *ptr){
 }
 
 void memory_reserve(void* start,void* end){
-    if(start < (void*)BUDDY_START || end > (void*)BUDDY_END){
-        uart_puts("Error: The memory is out of range\n");
-        //return;
-    }
-
+    end = (my_uint64_t)end % PAGE_SIZE ? (void*)((my_uint64_t)end + PAGE_SIZE - (my_uint64_t)end % PAGE_SIZE) : end;
     my_uint64_t start_index = get_index(start);
     my_uint64_t end_index = get_index(end);
     if((my_uint64_t)end % PAGE_SIZE != 0)
@@ -595,6 +591,11 @@ void memory_reserve(void* start,void* end){
     uart_putc(' ');
     uart_itoa(end_index);
     uart_putc('\n');
+
+    if(start < (void*)BUDDY_START || end > (void*)BUDDY_END){
+        uart_puts("Error: The memory is out of range\n");
+        //return;
+    }
 
     // mark lowest level(0) blocks as allocated(-1), higher level blocks as dividing into smaller blocks(-3) 
     for(i = 0; i < MAX_ORDER; i++){
@@ -644,19 +645,20 @@ void startup_init(void){
     memory_reserve((void*)PHYS_TO_VIRT(MMU_PGD_ADDR), (void*)PHYS_TO_VIRT(MMU_PTE_ADDR + 0x2000));
     //show_mem_stat();
     // reserve Kernel image in the physical memory
+    //memory_reserve((void*)PHYS_TO_VIRT(0x1000), (void*)&_kernel_start);
     memory_reserve((void*)&_kernel_start, (void*)&__end);
     //show_mem_stat();
     // reserve the CPIO archive in the physical memory
     memory_reserve((void*)PHYS_TO_VIRT(cpio_addr), (void*)PHYS_TO_VIRT(cpio_end));
     //show_mem_stat();
     // reserve the device tree blob in the physical memory
-    memory_reserve((void*)PHYS_TO_VIRT(_dtb_addr), (void*)PHYS_TO_VIRT(_dtb_addr + 0x30000));
+    memory_reserve((void*)_dtb_addr, (void*)(_dtb_addr + 0x30000));
     //show_mem_stat();
     // reserve allocator metadata in the physical memory
     memory_reserve((void*)BUDDY_METADATA_ADDR, (void*)BUDDY_METADATA_ADDR + sizeof(buddy_system_t) + ((1 << MAX_ORDER) - 1) * sizeof(buddy_block_list_t));
     //show_mem_stat();
     // reserve the pool metadata in the physical memory
-    memory_reserve((void*)&__end, (void*)allocated + 0x100000);
+    memory_reserve((void*)&__end, (void*)allocated + 0x500000);
     memory_reserve(&_stack_end, &_stack_top);
     //show_mem_stat();
 }

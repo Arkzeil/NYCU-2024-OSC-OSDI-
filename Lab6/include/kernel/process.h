@@ -18,7 +18,7 @@
 #define TASK_ZOMBIE -1
 #define PF_KTHREAD   2
 #define NR_SIGNALS 64
-#define THREAD_STK_SIZE 4096
+#define THREAD_STK_SIZE 16384
 
 typedef void (*signal_handler_t)(void);
 
@@ -48,6 +48,7 @@ typedef struct task_struct{
     int status;
     int pid;
     int flag;
+    char *data;
     // signal
     signal_handler_t signal_handler[NR_SIGNALS + 1];
     int sigcount[NR_SIGNALS + 1];
@@ -57,7 +58,7 @@ typedef struct task_struct{
     // Add VMA list
     list_head_t vma_list;
     // if this is not added, the signal handler might be corrupted. Still looking for reason
-    int space[690];
+    int space[688];
     trap_frame_t tf;
 }task_struct_t;
 

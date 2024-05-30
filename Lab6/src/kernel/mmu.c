@@ -1,5 +1,16 @@
 #include "kernel/mmu.h"
 
+void *memset(void *s, int c, my_uint64_t n)
+{
+  char *start = s;
+  for (my_uint64_t i = 0; i < n; i++)
+  {
+    start[i] = c;
+  }
+
+  return s;
+}
+
 void *set_2M_kernel_mmu(void *x0){
     my_uint64_t* pud_table = (my_uint64_t*)MMU_PUD_ADDR;
 
@@ -40,6 +51,12 @@ void map_one_page(my_uint64_t *pgd, my_uint64_t va, my_uint64_t pa, my_uint64_t 
             // set the attribute of the page
             // Bits[4:2] is for MAIR
             table[idx] = pa;
+            uart_puts("VA: ");
+            uart_b2x_64(va);
+            uart_putc(' ');
+            uart_puts("PA: ");
+            uart_b2x_64(pa);
+            uart_putc('\n');
             table[idx] |= PD_ACCESS | PD_TABLE | (MAIR_IDX_NORMAL_NOCACHE << 2) | PD_KNX | attr;
             return;
         }
@@ -48,7 +65,7 @@ void map_one_page(my_uint64_t *pgd, my_uint64_t va, my_uint64_t pa, my_uint64_t 
         // if the next level page table is not present, allocate a page for it
         if(table[idx] == 0){
             my_uint64_t *next_table = (my_uint64_t*)pool_alloc(4096);
-            memzero((my_uint64_t)next_table, 4096);
+            memset(next_table, 0, 4096);
             // set the attribute of the page table
             table[idx] = VIRT_TO_PHYS((my_uint64_t)next_table);
             table[idx] |= PD_ACCESS | PD_TABLE | (MAIR_IDX_NORMAL_NOCACHE << 2);
@@ -72,6 +89,13 @@ void mmu_add_vma(task_struct_t *tsk, my_uint64_t va, my_uint64_t pa, my_uint64_t
     // add the vm_area_struct to the vma list of the task
     // this should be equivalent to list_add_tail((list_head_t *)vma, &tsk->vma_list); ?
     list_add_tail((list_head_t *)vma, &tsk->vma_list);
+    uart_puts("vma added: ");
+    uart_b2x_64(va);
+    uart_putc(' ');
+    uart_b2x_64(pa);
+    uart_putc(' ');
+    uart_b2x_64(size);
+    uart_putc('\n');
 }
 
 void mmu_del_vma(task_struct_t *tsk){
@@ -151,6 +175,8 @@ void mmu_memfail_abort_handle(esr_el1_t* esr_el1){
     if ((esr_el1->iss & 0x3f) == TF_LEVEL0 || (esr_el1->iss & 0x3f) == TF_LEVEL1 || (esr_el1->iss & 0x3f) == TF_LEVEL2 || (esr_el1->iss & 0x3f) == TF_LEVEL3){
         uart_puts("[Translation fault]: ");
         uart_b2x_64(far_el1);
+        uart_putc(' ');
+        uart_b2x_64(esr_el1->iss & 0x3f);
         uart_putc('\n');
 
         my_uint64_t addr_offset = (far_el1 - the_area_ptr->virt_addr);
@@ -161,11 +187,13 @@ void mmu_memfail_abort_handle(esr_el1_t* esr_el1){
         if(!(the_area_ptr->rwx & (0b1 << 1))) flag |= PD_RDONLY;      // 2: writable
         if(  the_area_ptr->rwx & (0b1 << 0) ) flag |= PD_UK_ACCESS;   // 1: readable / accessible
         map_one_page(PHYS_TO_VIRT(current_task->context.pgd), the_area_ptr->virt_addr + addr_offset, the_area_ptr->phys_addr + addr_offset, flag);
-        uart_puts("[Translation fault]: Fixed\n");
+        //uart_puts("[Translation fault]: Fixed\n");
     }
     else{
         // For other Fault (permisson ...etc)
-        uart_puts("[Segmentation fault]: Kill Process\n");
+        uart_puts("[Segmentation fault(Other)]: Kill Process, ");
+        uart_b2x_64(far_el1);
+        uart_putc('\n');
         exit_process();
     }
 }

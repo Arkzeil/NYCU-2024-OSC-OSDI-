@@ -31,11 +31,11 @@ extern volatile unsigned int mailbox[32];
 #define END_TAG             0x00000000
 
 // mailbox address and flags
-#define MAILBOX_BASE    (MMIO_BASE    + 0xb880)
+#define MAILBOX_BASE    ((MMIO_BASE    + 0x0000B880))
 
-#define MAILBOX_READ    (MAILBOX_BASE + 0x00)
-#define MAILBOX_STATUS  (MAILBOX_BASE + 0x18)
-#define MAILBOX_WRITE   (MAILBOX_BASE + 0x20)
+#define MAILBOX_READ    ((volatile unsigned int*)(MAILBOX_BASE + 0x00))
+#define MAILBOX_STATUS  ((volatile unsigned int*)(MAILBOX_BASE + 0x18))
+#define MAILBOX_WRITE   ((volatile unsigned int*)(MAILBOX_BASE + 0x20))
 
 #define MAILBOX_EMPTY   0x40000000
 #define MAILBOX_FULL    0x80000000

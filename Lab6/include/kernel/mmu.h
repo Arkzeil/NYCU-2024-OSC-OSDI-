@@ -82,6 +82,7 @@ typedef struct{
 typedef struct task_struct task_struct_t;
 typedef struct thread thread_t;
 
+void *memset(void *s, int c, my_uint64_t n);
 void *set_2M_kernel_mmu(void *x0);
 void map_one_page(my_uint64_t *pgd, my_uint64_t va, my_uint64_t pa, my_uint64_t attr);
 void mmu_add_vma(task_struct_t *tsk, my_uint64_t va, my_uint64_t pa, my_uint64_t size, my_uint64_t attr, int is_alloced);

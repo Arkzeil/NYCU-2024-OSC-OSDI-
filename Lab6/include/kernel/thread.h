@@ -15,6 +15,7 @@
 #define SIGNAL_MAX  64
 
 extern void switch_to(void *prev, void *next);
+extern void ini_switch_to(void *prev, void *next);
 extern void* get_current();
 extern void fork_return(void);
 extern void to_user(void);

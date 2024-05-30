@@ -308,7 +308,7 @@ void my_shell(){
             }
             //idle_process();
             //while(1)
-                process_schedule();
+            ini_process_schedule();
         }
         else if(!string_comp(buf, "test2")){
             void *file_addr;

@@ -24,6 +24,11 @@ void main(void)
     uart_b2x_64((unsigned long long)&__end);
     uart_putc('\n');
 
+    _dtb_addr = PHYS_TO_VIRT(_dtb_addr);
+    uart_puts("DTB address: ");
+    uart_b2x_64((unsigned long long)_dtb_addr);
+    uart_putc('\n');
+
     fdt_traverse(initramfs_callback);
 
     asm volatile(

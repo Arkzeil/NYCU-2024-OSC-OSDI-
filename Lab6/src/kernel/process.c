@@ -38,18 +38,19 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
 
     // zero out the process context and trap frame
     // memzero should pass the address of the first byte of the struct
-    memzero((my_uint64_t)&(np->context), sizeof(process_context_t));
-    memzero((my_uint64_t)&np->tf, sizeof(trap_frame_t));
+    memset((my_uint64_t)&(np->context), 0, sizeof(process_context_t));
+    memset((my_uint64_t)&np->tf, 0, sizeof(trap_frame_t));
 
     // initialize the vma of new task struct
     INIT_LIST_HEAD(&(np->vma_list));
     np->context.pgd = pool_alloc(4096);
-    memzero((my_uint64_t)np->context.pgd, 4096);
+    memset((my_uint64_t)np->context.pgd, 0, 4096);
 
     // if it's kernel thread, we should set the function and argument
     if(clone_flags & PF_KTHREAD){
         np->context.x19 = fn;
         np->context.x20 = arg;
+        np->sp = (my_uint64_t)pool_alloc(THREAD_STK_SIZE);
         
         np->signal_is_checking = 0;
         for(int i = 0; i <= NR_SIGNALS; i++){
@@ -60,7 +61,32 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
     }
     // if it's user thread, we just copy the trap frame from current task
     else{
-        //gdb();
+        // copy the vma list of the parent process
+        list_head_t *pos;
+        vm_area_struct_t *vma;
+        list_for_each(pos, &current_task->vma_list){
+            // ignore device and signal wrapper
+            vma = (vm_area_struct_t *)pos;
+            if(vma->virt_addr == USER_SIGNAL_WRAPPER_VA || vma->virt_addr == PERIPHERAL_START)
+                continue;
+
+            char *new_alloc = (char*)pool_alloc(vma->area_size);
+            memset((my_uint64_t)new_alloc, 0, vma->area_size);
+
+            mmu_add_vma(np, vma->virt_addr, (my_uint64_t)VIRT_TO_PHYS(new_alloc), vma->area_size, vma->rwx, 1);
+            if(vma->virt_addr == USER_STACK_BASE - THREAD_STK_SIZE){
+                continue;
+            }
+            _memcpy(new_alloc, (void*)PHYS_TO_VIRT(vma->phys_addr), vma->area_size);
+            for(int i = 0; i < vma->area_size; i++){
+                *((char*)new_alloc + i) = *((char*)PHYS_TO_VIRT(vma->phys_addr) + i);
+            }
+        }
+        // reserve periphiaral space
+        mmu_add_vma(np, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
+        // reserve user signal wrapper space
+        mmu_add_vma(np, USER_SIGNAL_WRAPPER_VA, (my_uint64_t)VIRT_TO_PHYS(signal_handler_wrapper), 0x2000, 0b101, 0);
+        
         // 'copy' the state of the current task to the new task(by using pointer dereference)
         // this requires us to define 'memcpy' by ourself(as we didn't include stadard library) 
         //*(np->tf) = *(current_task->tf);
@@ -98,24 +124,24 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
         np->tf.spsr_el1 = current_task->tf.spsr_el1;
         np->tf.elr_el1 = current_task->tf.elr_el1;
         np->tf.sp_el0 = current_task->tf.sp_el0;
-
+        //memcpy(&np->context, &current_task->context, sizeof(process_context_t));
+        uart_b2x_64(np->tf.sp_el0);
+        uart_putc(' ');
+        uart_b2x_64(np->tf.elr_el1);
+        uart_putc('\n');
         // set the return value of the child process to 0
         np->tf.x0 = 0;
+
         // user process got its own stack
         void *new_stack = pool_alloc(THREAD_STK_SIZE);
-        // The compiler will automatically copy the stack when newly created child process return to a function
+        // The compiler will automatically copy the local variable when newly created child process return to a function
         // So we must reserve the space of local variables for the child process, e.g. parent:0x194000->0x193FD0, child's stack start from 0x195000(0x194000 + 0x1000)
         // If we don't adjust it, it will save the local variables of parent process to the child process's stack at 0x195000 to 0x195030
         // So we must adjust the stack pointer of the child process to 0x195000 - 0x30(i.e. 0x195000 - (0x194000 - 0x193FD0) ), 
-        np->tf.sp_el0 = (my_uint64_t)(new_stack + current_task->tf.sp_el0 - current_task->sp);
-        np->tf.fp = (my_uint64_t)(new_stack + current_task->tf.sp_el0 - current_task->sp);
+
         np->sp = (my_uint64_t)new_stack;
-        // copy the stack from parent process to child process
-        // for(int i = 0; i < 925; i++)
-        //     np->space[i] = current_task->space[i];
-        for(int i = 0; i < THREAD_STK_SIZE; i++){
-            *((char*)np->sp + i) = *((char*)current_task->sp + i);
-        }
+        // np->tf.sp_el0 = (my_uint64_t)(np->tf.sp_el0 + (np->sp - current_task->sp));
+        // np->tf.fp = (np->tf.sp_el0);
 
         np->signal_is_checking = 0;
         for(int i = 0; i <= NR_SIGNALS; i++){
@@ -123,27 +149,30 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
             np->sigcount[i] = 0;        // set all signal count to 0
         }
 
-        // copy the vma list of the parent process
-        list_head_t *pos;
-        vm_area_struct_t *vma;
-        list_for_each(pos, &current_task->vma_list){
-            // ignore device and signal wrapper
-            vma = (vm_area_struct_t *)pos;
-            if (vma->virt_addr == USER_SIGNAL_WRAPPER_VA || vma->virt_addr == PERIPHERAL_START)
-                continue;
-            
-            char *new_alloc = pool_alloc(vma->area_size);
-            mmu_add_vma(np, vma->virt_addr, (my_uint64_t)VIRT_TO_PHYS(new_alloc), vma->area_size, vma->rwx, 1);
-            _memcpy(new_alloc, (void*)PHYS_TO_VIRT(vma->phys_addr), vma->area_size);
+        //mmu_add_vma(np, np->sp, (my_uint64_t)VIRT_TO_PHYS(np->sp), THREAD_STK_SIZE, 0b111, 1);
+
+        // copy the stack from parent process to child process
+        // for(int i = 0; i < 925; i++)
+        //     np->space[i] = current_task->space[i];
+        for(int i = 0; i < THREAD_STK_SIZE; i++){
+            *((char*)np->sp + i) = *((char*)current_task->sp + i);
         }
-        // reserve periphiaral space
-        mmu_add_vma(np, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
-        // reserve user signal wrapper space
-        mmu_add_vma(np, USER_SIGNAL_WRAPPER_VA, (my_uint64_t)VIRT_TO_PHYS(signal_handler_wrapper), 0x2000, 0b101, 0);
-        //mmu_add_vma(np, new_stack, (my_uint64_t)VIRT_TO_PHYS(np->tf.spsr_el1), THREAD_STK_SIZE, 01011, 1);
+        for(int i = 0; i < 688; i++){
+            np->space[i] = current_task->space[i];
+        }
 
         np->context.pgd = VIRT_TO_PHYS(np->context.pgd);
 
+        uart_puts("New SP: ");
+        uart_b2x_64(np->tf.sp_el0);
+        uart_putc('\n');
+        uart_puts("Parent SP: ");
+        uart_b2x_64((current_task->tf.sp_el0 - current_task->sp));
+        uart_putc('\n');
+        uart_puts("Parent SP_B: ");
+        uart_b2x_64(current_task->sp);
+        uart_putc('\n');
+        gdb();
         /*asm volatile(
             "msr ttbr0_el1, %[var1];"
             :
@@ -188,20 +217,20 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
 // this is achieved by changing current task's trap frame 
 int to_el0(my_uint64_t fn){
     uart_puts("Starting moving to user mode\n");
-    memzero((my_uint64_t)&current_task->tf, sizeof(trap_frame_t));
+    memset((my_uint64_t)&current_task->tf, 0, sizeof(trap_frame_t));
     // since after the kernel process is finished, it will return to '1:' block of ret_from_work, which will then exexute load_all
     // and current sp is current_task->tf
     current_task->tf.elr_el1 = fn;
     current_task->tf.spsr_el1 = 0x00000000;
     //current_task->tf.spsr_el1 |= (1 << 0); // set the M[0] bit to 1, which means the processor is in EL0
     //current_task->tf.spsr_el1 |= (1 << 6); // set the DAIF[6] bit to 1, which means the processor is in EL0
-    void *stack = pool_alloc(THREAD_STK_SIZE);
-    if(!stack)
-        return -1;
-    gdb();
-    current_task->tf.sp_el0 = (my_uint64_t)(stack + THREAD_STK_SIZE);
-    current_task->tf.fp = (my_uint64_t)(stack + THREAD_STK_SIZE);
-    current_task->sp = (my_uint64_t)stack;
+    // void *stack = pool_alloc(THREAD_STK_SIZE);
+    // if(!stack)
+    //     return -1;
+    // gdb();
+    // current_task->tf.sp_el0 = (my_uint64_t)(stack + THREAD_STK_SIZE);
+    // current_task->tf.fp = (my_uint64_t)(stack + THREAD_STK_SIZE);
+    // current_task->sp = (my_uint64_t)stack;
     
     return 0;
 }
@@ -310,14 +339,23 @@ void process_schedule(void){
             next->status = TASK_RUNNING;
         }
     }
-    
+    my_uint64_t lr;
+    asm volatile(
+        "mov %[var1], lr;"
+        : [var1] "=r" (lr)    // Output operands
+        :
+    );
+    uart_b2x_64(lr);
+    uart_putc(' ');
     uart_itoa(prev->pid);
-    uart_puts(" ");
+    uart_putc(' ');
     uart_itoa(next->pid);
     uart_putc(' ');
-    uart_b2x_64(next->context.x19);
+    uart_b2x_64(prev->tf.elr_el1);
     uart_putc(' ');
-    uart_b2x_64(next->context.lr);
+    uart_b2x_64(next->tf.elr_el1);
+    uart_putc(' ');
+    uart_b2x_64(next->tf.sp_el0);
     uart_putc('\n');
 
     current_task = next;
@@ -388,21 +426,42 @@ void kernel_procsss(void){
     uart_b2x_64((my_uint64_t)elr);
     uart_putc('\n');
     
-    int err = to_el0((my_uint64_t)&user_process2);
-    //int err = to_el0((my_uint64_t)&fork_test);
+    //int err = to_el0((my_uint64_t)&user_process2);
+    int err = to_el0((my_uint64_t)&fork_test);
     if(err < 0)
         uart_puts("Error while moving to user mode\n");
     
     uart_puts("Kernel process ended\n");
-    //exit_process();
+    //mmu_add_vma(current_task, USER_KERNEL_BASE, (my_uint64_t)VIRT_TO_PHYS(&fork_test), 0x2000, 0b111, 0);
+    mmu_add_vma(current_task, USER_KERNEL_BASE, VIRT_TO_PHYS((my_uint64_t)&fork_test), 0x1000, 0b111, 0);    
+    mmu_add_vma(current_task, (USER_STACK_BASE - THREAD_STK_SIZE), VIRT_TO_PHYS(current_task->sp), 0x1000, 0b111, 0);
+    // reserve periphiaral space
+    mmu_add_vma(current_task, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
+    // reserve user signal wrapper space
+    mmu_add_vma(current_task, USER_SIGNAL_WRAPPER_VA, (my_uint64_t)VIRT_TO_PHYS(signal_handler_wrapper), 0x2000, 0b101, 0);
+
+    current_task->context.pgd = VIRT_TO_PHYS(current_task->context.pgd);
+    current_task->context.sp = USER_STACK_BASE;
+    current_task->context.fp = USER_STACK_BASE;
+    current_task->context.lr = USER_KERNEL_BASE;       
+    current_task->tf.elr_el1 = current_task->context.lr; 
+    current_task->tf.sp_el0 = current_task->context.sp;
+    current_task->tf.fp = current_task->context.fp;
+    current_task->sp = (USER_STACK_BASE - THREAD_STK_SIZE);
     asm volatile(
-        "mov %[var1], x30;"
-        : [var1] "=r" (elr)    // Output operands
+        "msr tpidr_el1, %[var1];"
+        :
+        : [var1] "r" (&current_task->context)
     );
-    uart_b2x_64((my_uint64_t)elr);
-    uart_putc('\n');
-    uart_b2x_64((my_uint64_t)current_task->tf.elr_el1);
-    uart_putc('\n');
+    asm volatile(
+        "dsb ish\r\n"
+        "msr ttbr0_el1, %[var1]\r\n"
+        "tlbi vmalle1\r\n"
+        "dsb ish\r\n"
+        "isb\r\n"
+        :
+        : [var1] "r" (current_task->context.pgd)
+    );
 }
 
 void user_process1(unsigned long arg){
@@ -542,31 +601,36 @@ void file_process(my_uint64_t file_addr){
     // char *temp;
     // uart_get_fn(temp);
 
-    file_data = (char*)pool_alloc(cpio_file_size);
+    //file_data = (char*)pool_alloc(cpio_file_size);
+    current_task->data = pool_alloc(cpio_file_size);
 
-    for(int i = 0; i < cpio_file_size; i++)
-        file_data[i] = ((char*)file_addr)[i];
-    //memcpy(file_data, (char*)file_addr, 0x3D000);
-
-    to_el0((my_uint64_t)file_data);
-
-    mmu_add_vma(current_task, USER_KERNEL_BASE, VIRT_TO_PHYS(file_data), cpio_file_size, 0b111, 0);
+    mmu_add_vma(current_task, USER_KERNEL_BASE, (my_uint64_t)VIRT_TO_PHYS(current_task->data), cpio_file_size, 0b111, 0);
     //mmu_add_vma(current_task, USER_KERNEL_BASE, VIRT_TO_PHYS(ret_from_fork), 0x1000, 0b111, 0);    
-    mmu_add_vma(current_task, (USER_STACK_BASE - THREAD_STK_SIZE), VIRT_TO_PHYS(current_task->sp), 0x1000, 0b111, 0);
+    mmu_add_vma(current_task, (USER_STACK_BASE - THREAD_STK_SIZE), VIRT_TO_PHYS(current_task->sp), 0x4000, 0b111, 0);
     // reserve periphiaral space
     mmu_add_vma(current_task, PERIPHERAL_START, PERIPHERAL_START, PERIPHERAL_END - PERIPHERAL_START, 0b011, 0);
     // reserve user signal wrapper space
     mmu_add_vma(current_task, USER_SIGNAL_WRAPPER_VA, (my_uint64_t)VIRT_TO_PHYS(signal_handler_wrapper), 0x2000, 0b101, 0);
 
+    // for(int i = 0; i < cpio_file_size; i++)
+    //     file_data[i] = ((char*)file_addr)[i];
+
+    for(int i = 0; i < cpio_file_size; i++)
+        current_task->data[i] = ((char*)file_addr)[i];
+    
+    to_el0((my_uint64_t)current_task->data);
+
     current_task->context.pgd = VIRT_TO_PHYS(current_task->context.pgd);
-    current_task->context.sp = USER_STACK_BASE;
-    current_task->context.fp = USER_STACK_BASE;
-    current_task->context.lr = USER_KERNEL_BASE;       
-    current_task->tf.elr_el1 = current_task->context.lr; 
-    current_task->tf.sp_el0 = current_task->context.sp;
-    current_task->tf.fp = current_task->context.fp;
+    // current_task->context.sp = USER_STACK_BASE;
+    // current_task->context.fp = USER_STACK_BASE;
+    // current_task->context.lr = USER_KERNEL_BASE;       
+    current_task->tf.elr_el1 = USER_KERNEL_BASE; 
+    current_task->tf.sp_el0 = USER_STACK_BASE;;
+    current_task->tf.fp = USER_STACK_BASE;
     // This leads to not scheduling the process?
-    current_task->sp = (USER_STACK_BASE - THREAD_STK_SIZE);
+    //current_task->sp = (USER_STACK_BASE - THREAD_STK_SIZE);
+
+    //memcpy(file_data, (char*)file_addr, 0x3D000);
 
     asm volatile(
         "msr tpidr_el1, %[var1];"
