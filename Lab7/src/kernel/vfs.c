@@ -10,7 +10,7 @@ int register_filesystem(struct filesystem* fs) {
       return i;
     }
   }
-  
+
   return -1;
 }
 
@@ -176,5 +176,11 @@ int vfs_lookup(const char* pathname, struct vnode** target){
 }
 
 void init_rootfs(void){
+  int index = tmpfs_register();
+  
+  rootfs = (struct mount*)pool_alloc(sizeof(struct mount));
+  filesystems[index].setup_mount(&filesystems[index], rootfs);
 
+  vfs_mkdir("/dev");
+  
 }

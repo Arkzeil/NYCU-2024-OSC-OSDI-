@@ -20,7 +20,7 @@ struct vnode {
   struct mount* mount;              // which mounted fs(superblock)
   struct vnode_operations* v_ops;   // vnode operations
   struct file_operations* f_ops;    // open file operations
-  void* internal;                   // point to fs's vnode
+  void* internal;                   // point to fs's vnode or inode
 };
 
 // file handle

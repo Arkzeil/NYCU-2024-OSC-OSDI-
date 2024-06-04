@@ -110,15 +110,64 @@ int tmpfs_create(struct vnode *dir_node, struct vnode **target, const char *comp
         // find an empty entry
         if(inode->entry[entry_index] == 0)
             break;
-        
+
+        if(string_comp(((struct tmpfs_inode*)(inode->entry[entry_index]->internal))->name, component_name) == 0){
+            uart_puts("tmpfs Create Error: File already exist\n");
+            return -1;
+        }
     }
 
     if(entry_index == MAX_DIR_ENTRY){
         uart_puts("tmpfs Create Error: Directory is full\n");
         return -1;
     }
+
+    if(string_len(component_name) > MAX_FILE_NAME_LEN){
+        uart_puts("tmpfs Create Error: File name too long\n");
+        return -1;
+    }
+    // create a vnode for the new file
+    inode->entry[entry_index] = tmpfs_create_vnode(0, file_t);
+    string_copy(((struct tmpfs_inode*)(inode->entry[entry_index]->internal))->name, component_name);
+
+    *target = inode->entry[entry_index];
+    return 0;
 }
 
 int tmpfs_mkdir(struct vnode *dir_node, struct vnode **target, const char *component_name){
+    struct tmpfs_inode* inode = (struct tmpfs_inode*)dir_node->internal;
+    
+    if(inode->type != dir_t){
+        uart_puts("tmpfs Mkdir Error: Not a directory\n");
+        return -1;
+    }
 
+    int entry_index;
+    
+    for(entry_index = 0; entry_index < MAX_DIR_ENTRY; entry_index++){
+        // find an empty entry
+        if(inode->entry[entry_index] == 0)
+            break;
+
+        if(string_comp(((struct tmpfs_inode*)(inode->entry[entry_index]->internal))->name, component_name) == 0){
+            uart_puts("tmpfs Mkdir Error: Directory already exist\n");
+            return -1;
+        }
+    }
+
+    if(entry_index == MAX_DIR_ENTRY){
+        uart_puts("tmpfs Mkdir Error: Directory is full\n");
+        return -1;
+    }
+
+    if(string_len(component_name) > MAX_FILE_NAME_LEN){
+        uart_puts("tmpfs Mkdir Error: Directory name too long\n");
+        return -1;
+    }
+    // create a vnode for the new directory
+    inode->entry[entry_index] = tmpfs_create_vnode(0, dir_t);
+    string_copy(((struct tmpfs_inode*)(inode->entry[entry_index]->internal))->name, component_name);
+
+    *target = inode->entry[entry_index];
+    return 0;
 }
