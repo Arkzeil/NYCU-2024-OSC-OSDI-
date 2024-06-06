@@ -9,7 +9,38 @@ int initramfs_register(){
 }
 
 int initramfs_setup_mount(struct filesystem *fs, struct mount *mount){
+    mount->fs = fs;
+    mount->root = initramfs_create_vnode(mount, dir_t);
     
+    struct initramfs_inode* root_inode = (struct initramfs_inode*)mount->root->internal;
+
+    // add all files in initramfs to the root directory
+    char *temp_addr = cpio_addr;
+    int namesize;
+    int filesize; 
+    struct cpio_newc_header* header = (struct cpio_newc_header*)cpio_addr;
+    int index = 0;
+    if(string_comp_l(header->c_magic, "070701", 6) != 0){
+        uart_puts("cpio magic value error\n");
+        return;
+    }
+    // loop until the end of cpio
+    while(string_comp((char*)(temp_addr + sizeof(struct cpio_newc_header)), "TRAILER!!!") != 0){
+        header = (struct cpio_newc_header*)temp_addr;
+        namesize = h2i(header->c_namesize, 8);
+        filesize = h2i(header->c_filesize, 8);
+
+        struct vnode *file_vnode = initramfs_create_vnode(0, file_t);
+        struct initramfs_inode* file_inode = file_vnode->internal;
+
+        file_inode->data_size = filesize;
+        file_inode->name = (char*)(temp_addr + sizeof(struct cpio_newc_header));
+        file_inode->data = (char*)(temp_addr + sizeof(struct cpio_newc_header) + namesize + align_offset((sizeof(struct cpio_newc_header) + namesize), 4));
+        
+        root_inode->entry[index++] = file_inode;
+        
+        temp_addr += (sizeof(struct cpio_newc_header) + namesize + filesize + align_offset((sizeof(struct cpio_newc_header) + namesize), 4) + align_offset(filesize, 4));
+    }
 }
 // create a vnode for initramfs
 struct vnode* initramfs_create_vnode(struct mount* mount, enum node_type type){
@@ -34,21 +65,51 @@ my_uint64_t initramfs_getsize(struct vnode *vd){
     return inode->data_size;
 }
 
-int initramfs_write(struct file *file, const void *buf, size_t len){
+int initramfs_write(struct file *file, const void *buf, my_uint64_t len){
     // it's read-only
     return -1;
 }
 
-int initramfs_read(struct file *file, void *buf, size_t len){}
+int initramfs_read(struct file *file, void *buf, my_uint64_t len){
+    struct initramfs_inode* inode = (struct initramfs_inode*)file->vnode->internal;
+    
+    if(file->f_pos + len > inode->data_size){
+        len = inode->data_size - file->f_pos;
+        string_copy_n(buf, inode->data + file->f_pos, len);
+    }
+    else
+        string_copy_n(buf, inode->data + file->f_pos, len);
 
-int initramfs_open(struct vnode *file_node, struct file **target){}
+    file->f_pos += len;
+
+    return len;
+}
+
+int initramfs_open(struct vnode *file_node, struct file **target){
+    (*target)->f_ops = file_node->f_ops;
+    (*target)->f_pos = 0;
+    (*target)->vnode = file_node;
+    return 0;
+}
 
 int initramfs_close(struct file *file){
     pool_free(file);
     return 0;
 }
 
-int initramfs_lookup(struct vnode *dir_node, struct vnode **target, const char *component_name){}
+int initramfs_lookup(struct vnode *dir_node, struct vnode **target, const char *component_name){
+    struct initramfs_inode* dir_inode = (struct initramfs_inode*)dir_node->internal;
+
+    for(int i = 0; i < MAX_RAMFS_ENTRY; i++){
+        if(dir_inode->entry[i] != 0 && string_comp(((struct initramfs_inode*)(dir_inode->entry[i]->internal))->name, component_name) == 0){
+            *target = dir_inode->entry[i];
+            return 0;
+        }
+    }
+
+    uart_puts("initramfs Lookup Error: Cannot find the vnode\n");
+    return -1;
+}
 
 int initramfs_create(struct vnode *dir_node, struct vnode **target, const char *component_name){
     // it's read-only

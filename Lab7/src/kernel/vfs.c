@@ -1,4 +1,6 @@
 #include "kernel/vfs.h"
+#include "kernel/tmpfs.h"
+#include "kernel/initramfs.h"
 
 int register_filesystem(struct filesystem* fs) {
   // register the file system to the kernel.
@@ -10,7 +12,18 @@ int register_filesystem(struct filesystem* fs) {
       return i;
     }
   }
+  uart_puts("Registering Error: Cannot register the file system\n");
+  return -1;
+}
 
+int register_devfs(struct file_operations* f_ops){
+  for(int i = 0; i < MAX_DEV; i++){
+    if(!reg_dev[i].open){
+      reg_dev[i] = *f_ops;
+      return i;
+    }
+  }
+  uart_puts("Registering Error: Cannot register the device file operations\n");
   return -1;
 }
 
@@ -69,7 +82,7 @@ int vfs_open(const char* pathname, int flags, struct file** target) {
 int vfs_close(struct file* file) {
   // 1. release the file handle
   // 2. Return error code if fails
-  file->vnode->f_ops->close(file);
+  return file->vnode->f_ops->close(file);
 }
 
 int vfs_write(struct file* file, const void* buf, my_uint64_t len) {
@@ -175,12 +188,45 @@ int vfs_lookup(const char* pathname, struct vnode** target){
   return 0;
 }
 
+long vfs_lseek64(struct file* file, long offset, int whence){
+  if(whence == SEEK_SET)
+    file->f_pos = offset;
+  else if(whence == SEEK_CUR)
+    file->f_pos += offset;
+  else if(whence == SEEK_END){
+    uart_puts("Seeking Error: SEEK_END is not supported\n");
+    return -1;
+  }
+  return file->f_pos;
+}
+
+int op_denied(void){
+  uart_puts("Operation Denied: No such operation in this fs\n");
+  return -1;
+}
+
+int vfs_mknod(char* pathname, int id){
+  struct file *dev_file = (struct file*)pool_alloc(sizeof(struct file));
+  // create a new device file(temporatory).
+  vfs_open(pathname, O_CREAT, &dev_file);
+  // assign the file operations to the device file
+  dev_file->vnode->f_ops = &reg_dev[id];
+  // close the temp device file (as it's in vfs now)
+  vfs_close(dev_file);
+
+  return 0;
+}
+
 void init_rootfs(void){
   int index = tmpfs_register();
   
   rootfs = (struct mount*)pool_alloc(sizeof(struct mount));
   filesystems[index].setup_mount(&filesystems[index], rootfs);
 
+  vfs_mkdir("/initramfs");
+  initramfs_register();
+  vfs_mount("/initramfs", "initramfs");
+  
   vfs_mkdir("/dev");
   
 }

@@ -4,11 +4,19 @@
 #include "kernel/type.h"
 #include "kernel/utils.h"
 #include "kernel/allocator.h"
-#include "kernel/tmpfs.h"
 
 #define MAX_PATHNAME 255
 #define O_CREAT 00000100
+#define MAX_FILE_SIZE 4096
 #define MAX_FS 0x50
+#define MAX_DEV 0x10
+#define MAX_FILE_NAME_LEN 15  // should for tmpfs
+
+#define SEEK_SET	0	/* Seek from beginning of file.  */
+#define SEEK_CUR	1	/* Seek from current position.  */
+#define SEEK_END	2	/* Seek from end of file.  */
+#define SEEK_DATA	3	/* Seek to next data.  */
+#define SEEK_HOLE	4	/* Seek to next hole.  */
 
 // dir_t = 0, file_t = 1
 enum node_type{
@@ -47,6 +55,7 @@ struct file_operations {
   int (*open)(struct vnode* file_node, struct file** target);
   int (*close)(struct file* file);
   long (*lseek64)(struct file* file, long offset, int whence);
+  long (*getsize)(struct vnode *vd);
 };
 
 struct vnode_operations {
@@ -63,9 +72,12 @@ struct vnode_operations {
 
 struct mount* rootfs;
 struct filesystem filesystems[MAX_FS];
+struct file_operations reg_dev[MAX_DEV];
 
 
 int register_filesystem(struct filesystem* fs);
+int register_devfs(struct file_operations* f_ops);
+
 struct filesystem* get_fs(const char* name);
 int vfs_open(const char* pathname, int flags, struct file** target);
 int vfs_close(struct file* file);
@@ -76,6 +88,11 @@ int vfs_mkdir(const char* pathname);
 // e.g. mount "devfs" on "/dev"
 int vfs_mount(const char* target, const char* filesystem);
 int vfs_lookup(const char* pathname, struct vnode** target);
+long vfs_lseek64(struct file* file, long offset, int whence);
+int op_denied(void);
+
+int vfs_mknod(char* pathname, int id);
+
 void init_rootfs(void);
 
 #endif

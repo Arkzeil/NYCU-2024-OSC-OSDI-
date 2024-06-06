@@ -32,7 +32,7 @@ int tmpfs_setup_mount(struct filesystem *fs, struct mount *mount){
     return 0;
 }
 
-int tmpfs_write(struct file *file, const void *buf, size_t len){
+int tmpfs_write(struct file *file, const void *buf, my_uint64_t len){
     struct tmpfs_inode* inode = (struct tmpfs_inode*)file->vnode->internal;
 
     string_copy(inode->data + file->f_pos, buf);
@@ -44,7 +44,7 @@ int tmpfs_write(struct file *file, const void *buf, size_t len){
     return len;    
 }
 
-int tmpfs_read(struct file *file, void *buf, size_t len){
+int tmpfs_read(struct file *file, void *buf, my_uint64_t len){
     struct tmpfs_inode* inode = (struct tmpfs_inode*)file->vnode->internal;
     
     if(file->f_pos + len > inode->data_size){
@@ -86,7 +86,7 @@ int tmpfs_lookup(struct vnode *dir_node, struct vnode **target, const char *comp
             break;
 
         struct tmpfs_inode* inode = (struct tmpfs_inode*)vnode->internal;
-        if(tring_comp(inode->name, component_name) == 0){
+        if(string_comp(inode->name, component_name) == 0){
             *target = vnode;
             return 0;
         }

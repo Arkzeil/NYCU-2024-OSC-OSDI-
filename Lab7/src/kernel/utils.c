@@ -141,10 +141,20 @@ void delay(unsigned int time){
 }
 
 void *memset(void *s, int c, my_uint64_t n){
-  char *start = s;
-  for (size_t i = 0; i < n; i++){
-    start[i] = c;
-  }
+    char *start = s;
+    for (my_uint64_t i = 0; i < n; i++){
+        start[i] = c;
+    }
 
-  return s;
+    return s;
+}
+
+char *memcpy(void *dest, const void *src, unsigned long long len){
+    char *d = dest;
+    const char *s = src;
+    while (len--)
+    {
+    *d++ = *s++;
+    }
+    return dest;
 }

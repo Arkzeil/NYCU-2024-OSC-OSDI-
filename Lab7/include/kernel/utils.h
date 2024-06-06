@@ -33,5 +33,6 @@ unsigned int BE2LE(unsigned int BE);
 // delay time ticks
 void delay(unsigned int time);
 void *memset(void *s, int c, my_uint64_t n);
+char *memcpy(void *dest, const void *src, unsigned long long len);
 
 #endif
