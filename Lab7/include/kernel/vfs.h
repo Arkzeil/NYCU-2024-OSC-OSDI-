@@ -69,10 +69,11 @@ struct vnode_operations {
   int (*mkdir)(struct vnode* dir_node, struct vnode** target,
               const char* component_name);
 };
-
-struct mount* rootfs;
-struct filesystem filesystems[MAX_FS];
-struct file_operations reg_dev[MAX_DEV];
+// Don't define variables in headers. Put declarations in header and definitions in one of the .c files.
+// https://stackoverflow.com/questions/17764661/multiple-definition-of-linker-error
+extern struct mount* rootfs;
+extern struct filesystem filesystems[MAX_FS];
+extern struct file_operations reg_dev[MAX_DEV];
 
 
 int register_filesystem(struct filesystem* fs);
@@ -94,5 +95,7 @@ int op_denied(void);
 int vfs_mknod(char* pathname, int id);
 
 void init_rootfs(void);
+
+void get_absolute_path(char *path, char *cur_working_dir);
 
 #endif

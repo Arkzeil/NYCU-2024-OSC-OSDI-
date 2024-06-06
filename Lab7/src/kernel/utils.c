@@ -80,6 +80,10 @@ void string_copy_n(char *dst, char *src, int n){
     dst[i] = '\0';
 }
 
+void string_concat(char *dst, char *src){
+    string_copy(dst + string_len(dst), src);
+}
+
 int h2i(const char *str, int len){
     int i;
     int res = 0;

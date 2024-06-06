@@ -31,7 +31,4 @@ int tmpfs_lookup(struct vnode *dir_node, struct vnode **target, const char *comp
 int tmpfs_create(struct vnode *dir_node, struct vnode **target, const char *component_name);
 int tmpfs_mkdir(struct vnode *dir_node, struct vnode **target, const char *component_name);
 
-struct file_operations tmpfs_f_ops = {tmpfs_write, tmpfs_read, tmpfs_open, tmpfs_close, vfs_lseek64, tmpfs_getsize};
-struct vnode_operations tmpfs_v_ops = {tmpfs_lookup, tmpfs_create, tmpfs_mkdir};
-
 #endif

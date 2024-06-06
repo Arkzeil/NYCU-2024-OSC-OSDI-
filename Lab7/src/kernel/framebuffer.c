@@ -8,6 +8,8 @@ unsigned int __attribute__((aligned(16))) mbox[36];
 unsigned int width, height, pitch, isrgb; /* dimensions and channel order */
 unsigned char *lfb;                       /* raw frame buffer address */
 
+struct file_operations framebuffer_f_ops = {framebuffer_write, op_denied, framebuffer_open, framebuffer_close, vfs_lseek64, op_denied};
+
 int init_dev_framebuffer(){
     mbox[0] = 35 * 4;
     mbox[1] = MBOX_REQUEST;
@@ -55,7 +57,7 @@ int init_dev_framebuffer(){
 
     // this might not return exactly what we asked for, could be
     // the closest supported resolution instead
-    if (mbox_call(MBOX_CH_PROP, mbox) && mbox[20] == 32 && mbox[28] != 0){
+    if (mailbox_call(MBOX_CH_PROP, mbox) && mbox[20] == 32 && mbox[28] != 0){
         mbox[28] &= 0x3FFFFFFF; // convert GPU address to ARM address
         width = mbox[5];        // get actual physical width
         height = mbox[6];       // get actual physical height
@@ -70,7 +72,7 @@ int init_dev_framebuffer(){
     return register_devfs(&framebuffer_f_ops);
 }
 
-int framebuffer_write(struct file *file, const void *buf, size_t len){
+int framebuffer_write(struct file *file, const void *buf, my_uint64_t len){
     lock();
     if(file->f_pos + len > pitch * height){
         uart_puts("Framebuffer write out of bounds\n");

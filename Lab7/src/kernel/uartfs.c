@@ -1,5 +1,11 @@
 #include "kernel/uartfs.h"
 
+struct file_operations dev_f_ops = {dev_uart_write, dev_uart_read, dev_uart_open, dev_uart_close, op_denied, op_denied};
+
+int init_dev_uart(void){
+    return register_devfs(&dev_f_ops);
+}
+
 int dev_uart_write(struct file *file, const void *buf, my_uint64_t len){
     for(int i = 0; i < len; i++){
         uart_putc(((char*)buf)[i]);

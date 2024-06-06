@@ -10,6 +10,7 @@
 #include "kernel/sys.h"
 #include "kernel/timer.h"
 #include "kernel/signal.h"
+#include "kernel/vfs.h"
 
 #define NR_TASKS 64
 #define TASK_RUNNING 1
@@ -17,6 +18,8 @@
 #define TASK_ZOMBIE -1
 #define PF_KTHREAD   2
 #define NR_SIGNALS 64
+
+#define MAX_FD 16
 
 typedef void (*signal_handler_t)(void);
 
@@ -51,8 +54,11 @@ typedef struct task_struct{
     signal_handler_t cur_signal_handler;
     int signal_is_checking;
     process_context_t signal_saved_context;
+    // VFS
+    char curr_working_dir[MAX_PATHNAME+1];
+    struct file* file_descriptors_table[MAX_FD+1];
     // if this is not added, the signal handler might be corrupted. Still looking for reason
-    int space[697];
+    int space[599];
     trap_frame_t tf;
 }task_struct_t;
 

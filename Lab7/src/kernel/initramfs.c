@@ -1,5 +1,8 @@
 #include "kernel/initramfs.h"
 
+struct file_operations initramfs_f_ops = {initramfs_write, initramfs_read, initramfs_open, initramfs_close, vfs_lseek64, initramfs_getsize};
+struct vnode_operations initramfs_v_ops = {initramfs_lookup, initramfs_create, initramfs_mkdir};
+
 int initramfs_register(){
     struct filesystem fs;
     fs.name = "initramfs";
@@ -22,7 +25,7 @@ int initramfs_setup_mount(struct filesystem *fs, struct mount *mount){
     int index = 0;
     if(string_comp_l(header->c_magic, "070701", 6) != 0){
         uart_puts("cpio magic value error\n");
-        return;
+        return -1;
     }
     // loop until the end of cpio
     while(string_comp((char*)(temp_addr + sizeof(struct cpio_newc_header)), "TRAILER!!!") != 0){
@@ -37,10 +40,11 @@ int initramfs_setup_mount(struct filesystem *fs, struct mount *mount){
         file_inode->name = (char*)(temp_addr + sizeof(struct cpio_newc_header));
         file_inode->data = (char*)(temp_addr + sizeof(struct cpio_newc_header) + namesize + align_offset((sizeof(struct cpio_newc_header) + namesize), 4));
         
-        root_inode->entry[index++] = file_inode;
+        root_inode->entry[index++] = file_vnode;
         
         temp_addr += (sizeof(struct cpio_newc_header) + namesize + filesize + align_offset((sizeof(struct cpio_newc_header) + namesize), 4) + align_offset(filesize, 4));
     }
+    return 0;
 }
 // create a vnode for initramfs
 struct vnode* initramfs_create_vnode(struct mount* mount, enum node_type type){

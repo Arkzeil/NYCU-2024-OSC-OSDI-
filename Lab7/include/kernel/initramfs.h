@@ -29,7 +29,4 @@ int initramfs_lookup(struct vnode *dir_node, struct vnode **target, const char *
 int initramfs_create(struct vnode *dir_node, struct vnode **target, const char *component_name);
 int initramfs_mkdir(struct vnode *dir_node, struct vnode **target, const char *component_name);
 
-struct file_operations initramfs_f_ops = {initramfs_write, initramfs_read, initramfs_open, initramfs_close, vfs_lseek64, initramfs_getsize};
-struct vnode_operations initramfs_v_ops = {initramfs_lookup, initramfs_create, initramfs_mkdir};
-
 #endif

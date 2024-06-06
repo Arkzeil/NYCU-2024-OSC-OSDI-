@@ -18,6 +18,7 @@ void string_set(char *str, int n, int size);
 // this is for preserving char array when passing as function parameter
 void string_copy(char *dst, char *src);
 void string_copy_n(char *dst, char *src, int n);
+void string_concat(char *dst, char *src);
 // used for cpio length conversion(hex->int dec), it needs string length 
 int h2i(const char *str, int len); 
 // return a offset value to let i aligned to 'align' format

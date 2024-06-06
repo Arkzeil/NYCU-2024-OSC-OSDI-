@@ -1,5 +1,8 @@
 #include "kernel/tmpfs.h"
 
+struct file_operations tmpfs_f_ops = {tmpfs_write, tmpfs_read, tmpfs_open, tmpfs_close, vfs_lseek64, tmpfs_getsize};
+struct vnode_operations tmpfs_v_ops = {tmpfs_lookup, tmpfs_create, tmpfs_mkdir};
+
 int tmpfs_register(){
     struct filesystem fs;
     fs.name = "tmpfs";
@@ -10,7 +13,7 @@ int tmpfs_register(){
 
 struct vnode* tmpfs_create_vnode(struct mount* mount, enum node_type type){
     struct vnode* vnode = (struct vnode*)pool_alloc(sizeof(struct vnode));
-    struct tmpfs_inode* inode = (struct tmpfs_node*)pool_alloc(sizeof(struct tmpfs_inode));
+    struct tmpfs_inode* inode = (struct tmpfs_inode*)pool_alloc(sizeof(struct tmpfs_inode));
 
     vnode->mount = mount;
     vnode->v_ops = &tmpfs_v_ops;
@@ -35,7 +38,7 @@ int tmpfs_setup_mount(struct filesystem *fs, struct mount *mount){
 int tmpfs_write(struct file *file, const void *buf, my_uint64_t len){
     struct tmpfs_inode* inode = (struct tmpfs_inode*)file->vnode->internal;
 
-    string_copy(inode->data + file->f_pos, buf);
+    string_copy(inode->data + file->f_pos, (char*)buf);
     file->f_pos += len;
     // update the size of the file
     if(file->f_pos > inode->data_size)
@@ -128,7 +131,7 @@ int tmpfs_create(struct vnode *dir_node, struct vnode **target, const char *comp
     }
     // create a vnode for the new file
     inode->entry[entry_index] = tmpfs_create_vnode(0, file_t);
-    string_copy(((struct tmpfs_inode*)(inode->entry[entry_index]->internal))->name, component_name);
+    string_copy(((struct tmpfs_inode*)(inode->entry[entry_index]->internal))->name, (char*)component_name);
 
     *target = inode->entry[entry_index];
     return 0;
@@ -166,7 +169,7 @@ int tmpfs_mkdir(struct vnode *dir_node, struct vnode **target, const char *compo
     }
     // create a vnode for the new directory
     inode->entry[entry_index] = tmpfs_create_vnode(0, dir_t);
-    string_copy(((struct tmpfs_inode*)(inode->entry[entry_index]->internal))->name, component_name);
+    string_copy(((struct tmpfs_inode*)(inode->entry[entry_index]->internal))->name, (char*)component_name);
 
     *target = inode->entry[entry_index];
     return 0;

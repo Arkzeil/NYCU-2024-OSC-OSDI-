@@ -1,6 +1,12 @@
 #include "kernel/vfs.h"
 #include "kernel/tmpfs.h"
 #include "kernel/initramfs.h"
+#include "kernel/uartfs.h"
+#include "kernel/framebuffer.h"
+
+struct mount* rootfs;
+struct filesystem filesystems[MAX_FS];
+struct file_operations reg_dev[MAX_DEV];
 
 int register_filesystem(struct filesystem* fs) {
   // register the file system to the kernel.
@@ -50,7 +56,7 @@ int vfs_open(const char* pathname, int flags, struct file** target) {
         last_slash_index = i;
     }
 
-    string_copy(dir_name, pathname);
+    string_copy(dir_name, (char*)pathname);
     dir_name[last_slash_index] = '\0';
     // To see if we can find the vnode of the component(dir_name)
     if(vfs_lookup(dir_name, &node) != 0){
@@ -113,7 +119,7 @@ int vfs_mkdir(const char* pathname){
   for(int i = 0; i < last_slash_index; i++)
     dir_name[i] = pathname[i];
 
-  string_copy(new_dir_name, pathname + last_slash_index + 1);
+  string_copy(new_dir_name, (char*)(pathname + last_slash_index + 1));
 
   if(vfs_lookup(dir_name, &node) != 0){
     uart_puts("Mkdir Error: Cannot find the vnode of the dir\n");
@@ -222,11 +228,58 @@ void init_rootfs(void){
   
   rootfs = (struct mount*)pool_alloc(sizeof(struct mount));
   filesystems[index].setup_mount(&filesystems[index], rootfs);
-
+  // create /initramfs directory
   vfs_mkdir("/initramfs");
   initramfs_register();
   vfs_mount("/initramfs", "initramfs");
-  
+  // create /dev directory
   vfs_mkdir("/dev");
-  
+  int uart_dev_id = init_dev_uart();
+  vfs_mknod("/dev/uart", uart_dev_id);
+  int framebuffer_dev_id = init_dev_framebuffer();
+  vfs_mknod("/dev/framebuffer", framebuffer_dev_id);
+}
+
+void get_absolute_path(char *path, char *cur_working_dir){
+  //concatenated with the curr_working_dir and relative to form an absolute path.
+  char abs_path[MAX_PATHNAME + 1] = {};
+  int index = 0;
+
+  if(path[0] != '/'){
+    char temp[MAX_PATHNAME + 1];
+
+    string_copy(temp, cur_working_dir);
+    // if the current working directory is not root
+    if(string_comp(cur_working_dir, "/") != 0)
+      string_concat(temp, "/");
+
+    string_concat(temp, path);
+    string_copy(path, temp);
+  }
+
+  for(int i = 0; i < string_len(path); i++){
+    // "/../" -> "/
+    if(path[i] == '/' && path[i+1] == '.' && path[i+2] == '.'){
+      // find the last '/', this one seemed weird
+      for(int j = index; j >= 0; j--){
+        if(abs_path[j] == '/'){
+          abs_path[j] = '\0';
+          index = j;
+          break;
+        }
+      }
+      i += 2;
+      continue;
+    }
+    // "/./" -> "/"
+    else if(path[i] == '/' && path[i+1] == '.'){
+      i++;
+      continue;
+    }
+    else
+      abs_path[index++] = path[i];
+  }
+  abs_path[index] = '\0';
+
+  string_copy(path, abs_path);
 }
