@@ -4,6 +4,7 @@
 #include "kernel/cpio.h"
 #include "kernel/allocator.h"
 #include "kernel/dtb.h"
+#include "kernel/vfs.h"
 // this one need to be outside any function
 char *cpio_addr;
 char *cpio_end;
@@ -38,6 +39,8 @@ void main(void)
     boot_timer_flag = 0;
     //uart_irq_on();
     startup_init();
+
+    init_rootfs();
 
     my_shell();
 }

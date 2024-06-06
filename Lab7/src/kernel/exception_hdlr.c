@@ -75,31 +75,83 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
             break;
         case 3:
             uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
             val = exec((const char *)current_tf->x0, (char *const *)current_tf->x1);
             break;
         case 4:
             uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
             val = fork(args);
             break;
         case 5:
             uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
             exit();
             break;
         case 6:
             uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
             val = mbox_call((unsigned char)current_tf->x0, (unsigned int *)current_tf->x1);
             break;
         case 7:
             uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
             kill((int)current_tf->x0);
             break;
         case 8:
             uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
             sigreg((int)current_tf->x0, (void (*)())current_tf->x1);
             break;
         case 9:
             uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
             sigkill((int)current_tf->x0, (int)current_tf->x1);
+            break;
+        case 11:
+            uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
+            val = open((const char *)current_tf->x0, (int)current_tf->x1);
+            break;
+        case 12:
+            uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
+            val = close((int)current_tf->x0);
+            break;
+        case 13:
+            uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
+            val = write((int)current_tf->x0, (const void *)current_tf->x1, (unsigned long)current_tf->x2);
+            break;
+        case 14:
+            uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
+            val = read((int)current_tf->x0, (void *)current_tf->x1, (unsigned long)current_tf->x2);
+            break;
+        case 15:
+            uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
+            val = mkdir((const char *)current_tf->x0, (unsigned)current_tf->x1);
+            break;
+        case 16:
+            uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
+            val = mount((const char *)current_tf->x0, (const char *)current_tf->x1, (const char *)current_tf->x2, (unsigned long)current_tf->x3, (const void *)current_tf->x4);
+            break;
+        case 17:
+            uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
+            val = chdir((const char *)current_tf->x0);
+            break;
+        case 18:   
+            uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
+            val = lseek64((int)current_tf->x0, (long)current_tf->x1, (int)current_tf->x2);
+            break;
+        case 19:
+            uart_b2x_64((unsigned long long)syscall_num);
+            uart_putc('\n');
+            val = ioctl((int)current_tf->x0, (unsigned long)current_tf->x1, (void *)current_tf->x2);
             break;
         case 64:
             uart_b2x_64((unsigned long long)syscall_num);

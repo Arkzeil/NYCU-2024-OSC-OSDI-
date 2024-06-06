@@ -45,6 +45,10 @@ int exec(const char* name, char *const argv[]){
     struct file *f;
     unsigned int data_size;
 
+    uart_puts("exec: ");
+    uart_puts(name);
+    uart_puts("\n");
+
     string_copy(abs_path, (char*)name);
     get_absolute_path(abs_path, current_task->curr_working_dir);
     vfs_lookup(abs_path, &target_file);
@@ -189,6 +193,10 @@ int open(const char *pathname, int flags){
     string_copy(abs_path, (char*)pathname);
     get_absolute_path(abs_path, current_task->curr_working_dir);
 
+    uart_puts("open: ");
+    uart_puts(abs_path);
+    uart_puts("\n");
+
     for(int i = 0; i < MAX_FD; i++){
         // find a empty file descriptor
         if(current_task->file_descriptors_table[i] == 0){
@@ -309,6 +317,13 @@ extern unsigned int isrgb;
 
 // syscall number : 19
 int ioctl(int fd, unsigned long request, void *info){
+
+    uart_puts("ioctl: ");
+    uart_puts("fd: ");
+    uart_itoa(fd);
+    uart_puts(" request: ");
+    uart_itoa(request);
+    uart_puts("\n");
     if(request == 0){
         ((struct framebuffer_info*)info)->width = width;
         ((struct framebuffer_info*)info)->height = height;

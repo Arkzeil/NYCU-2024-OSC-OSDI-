@@ -79,6 +79,7 @@ int framebuffer_write(struct file *file, const void *buf, my_uint64_t len){
         len = pitch * height - file->f_pos;
     }
     memcpy(lfb + file->f_pos, buf, len);
+    file->f_pos += len;
     unlock();
     return len;
 }
