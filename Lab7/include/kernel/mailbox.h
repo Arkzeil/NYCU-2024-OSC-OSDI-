@@ -6,7 +6,7 @@
 
 // https://github.com/raspberrypi/firmware/wiki/Mailbox-property-interface
 // Not sure how large to declare, but many length is less than 28, si I choosed 32?
-extern volatile unsigned int mailbox[32];
+extern volatile unsigned int mailbox[36];
 
 /* channels */
 #define MAILBOX_CH_POWER   0

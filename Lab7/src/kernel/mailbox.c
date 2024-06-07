@@ -1,7 +1,7 @@
 #include "kernel/mailbox.h"
 
 // The buffer itself is 16-byte aligned as only the upper 28 bits of the address can be passed via the mailbox.
-volatile unsigned int __attribute__((aligned(16))) mailbox[32];
+volatile unsigned int __attribute__((aligned(16))) mailbox[36];
 
 int mailbox_call(){
     // The mailbox interface has 28 bits (MSB) available for the value(message address) and 4 bits (LSB) for the channel
