@@ -107,6 +107,13 @@ int copy_process(my_uint64_t clone_flags, my_uint64_t fn, my_uint64_t arg, my_ui
             np->signal_handler[i] = current_task->signal_handler[i];  // set all signal handler to default
             np->sigcount[i] = 0;        // set all signal count to 0
         }
+
+        for(int i = 0; i < MAX_FD; i++){
+            if(current_task->file_descriptors_table[i]){
+                np->file_descriptors_table[i] = pool_alloc(sizeof(struct file));
+                *(np->file_descriptors_table[i]) = *(current_task->file_descriptors_table[i]);
+            }
+        }
         //return 0;
     }
     uart_puts("context x19: ");
@@ -243,6 +250,10 @@ void kill_zombie_process(void){
     lock();
     for(int i = 0; i < NR_TASKS; i++){
         if(PCB[i] && PCB[i]->status == TASK_ZOMBIE){
+            for(int k = 0; k < MAX_FD; k++){
+                if(PCB[i]->file_descriptors_table)
+                    vfs_close(PCB[i]->file_descriptors_table[k]);   
+            }
             pool_free((void*)PCB[i]->sp);
             pool_free((void*)PCB[i]);
             PCB[i] = 0;
@@ -441,6 +452,10 @@ void file_process(my_uint64_t file_addr){
         :
         : [var1] "r" (&current_task->context)
     );
+
+    vfs_open("/dev/uart", 0, &current_task->file_descriptors_table[0]); // stdin
+    vfs_open("/dev/uart", 0, &current_task->file_descriptors_table[1]); // stdout
+    vfs_open("/dev/uart", 0, &current_task->file_descriptors_table[2]); // stderr
 
     boot_timer_flag = 2;   
 

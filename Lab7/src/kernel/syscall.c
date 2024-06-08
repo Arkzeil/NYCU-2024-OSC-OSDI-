@@ -40,6 +40,7 @@ unsigned int uart_write(const char buf[], my_uint64_t size){
 // So we use current_tf to modified the user space register
 // then use a thread to execute it
 int exec(const char* name, char *const argv[]){
+    lock();
     char *abs_path[MAX_PATHNAME + 1];
     struct vnode* target_file;
     struct file *f;
@@ -49,6 +50,8 @@ int exec(const char* name, char *const argv[]){
     uart_puts(name);
     uart_puts("\n");
 
+    //memzero((my_uint64_t)&current_task->tf, sizeof(trap_frame_t));
+    
     string_copy(abs_path, (char*)name);
     get_absolute_path(abs_path, current_task->curr_working_dir);
     vfs_lookup(abs_path, &target_file);
@@ -65,10 +68,22 @@ int exec(const char* name, char *const argv[]){
         current_task->sigcount[i] = 0;        // set all signal count to 0
     }
 
-    current_tf->elr_el1 = (my_uint64_t)file_data;
-    current_tf->sp_el0 = (my_uint64_t)current_task->sp + THREAD_STK_SIZE;
+    // for(int i = 0; i < MAX_FD; i++){
+    //     if(current_task->file_descriptors_table[i] != 0){
+    //         //vfs_close(current_task->file_descriptors_table[i]);
+    //         current_task->file_descriptors_table[i] = 0;
+    //     }
+    // }
 
+    // vfs_open("/dev/uart", 0, &current_task->file_descriptors_table[0]); // stdin
+    // vfs_open("/dev/uart", 0, &current_task->file_descriptors_table[1]); // stdout
+    // vfs_open("/dev/uart", 0, &current_task->file_descriptors_table[2]); // stderr
+    my_uint64_t new_stk = (my_uint64_t)pool_alloc(THREAD_STK_SIZE);
+
+    current_tf->elr_el1 = (my_uint64_t)file_data;
+    current_tf->sp_el0 = (my_uint64_t)new_stk + (current_task->tf.sp_el0 - current_task->sp);
     current_tf->x0 = 0;
+    unlock();
     return 0;
 }
 // In C, fork will return 0 to the child process and return the child's pid to the parent process
@@ -201,7 +216,14 @@ int open(const char *pathname, int flags){
         // find a empty file descriptor
         if(current_task->file_descriptors_table[i] == 0){
             if(vfs_open(abs_path, flags, &current_task->file_descriptors_table[i]) != 0){
-                current_task->file_descriptors_table[i] = 0;
+                // current_task->file_descriptors_table[i] = 0;
+                // current_tf->x0 = -1;
+                // return -1;
+                break;
+            }
+            if(current_task->file_descriptors_table[i] == 0){
+                uart_puts("Error during open\n");
+                delay(1000000);
                 current_tf->x0 = -1;
                 return -1;
             }
@@ -209,12 +231,20 @@ int open(const char *pathname, int flags){
             return i;
         }
     }
+    uart_puts("No file descriptor available\n");
+    delay(1000000);
+    delay(1000000);
+    delay(1000000);
     current_tf->x0 = -1;
     return -1;
 }
 
 // syscall number : 12
 int close(int fd){
+    uart_puts("close: ");
+    uart_itoa(fd);
+    uart_puts("\n");
+
     if(current_task->file_descriptors_table[fd] != 0){
         vfs_close(current_task->file_descriptors_table[fd]);
         current_task->file_descriptors_table[fd] = 0;
@@ -230,6 +260,12 @@ int close(int fd){
 // syscall number : 13
 // remember to return read size or error code
 long write(int fd, const void *buf, unsigned long count){
+    uart_puts("write: ");
+    uart_puts(buf);
+    uart_puts(" to fd: ");
+    uart_itoa(fd);
+    uart_puts("\n");
+
     if(current_task->file_descriptors_table[fd] != 0){
         current_tf->x0 = vfs_write(current_task->file_descriptors_table[fd], buf, count);
         return current_tf->x0;
@@ -243,6 +279,10 @@ long write(int fd, const void *buf, unsigned long count){
 // syscall number : 14
 // remember to return read size or error code
 long read(int fd, void *buf, unsigned long count){
+    uart_puts("read: ");
+    uart_puts("from fd: ");
+    uart_itoa(fd);
+    uart_puts("\n");
     if(current_task->file_descriptors_table[fd] != 0){
         current_tf->x0 = vfs_read(current_task->file_descriptors_table[fd], buf, count);
         return current_tf->x0;
@@ -261,6 +301,10 @@ int mkdir(const char *pathname, unsigned mode){
     string_copy(abs_path, (char*)pathname);
     get_absolute_path(abs_path, current_task->curr_working_dir);
 
+    uart_puts("mkdir: ");
+    uart_puts(abs_path);
+    uart_puts("\n");
+
     if(vfs_mkdir(abs_path) != 0){
         current_tf->x0 = -1;
         return -1;
@@ -277,6 +321,10 @@ int mount(const char *src, const char *target, const char *filesystem, unsigned 
     string_copy(abs_path, (char*)target);
     get_absolute_path(abs_path, current_task->curr_working_dir);
 
+    uart_puts("mount: ");
+    uart_puts(abs_path);
+    uart_puts("\n");
+
     if(vfs_mount(abs_path, filesystem) != 0){
         current_tf->x0 = -1;
         return -1;
@@ -292,6 +340,10 @@ int chdir(const char *path){
     string_copy(abs_path, (char*)path);
     get_absolute_path(abs_path, current_task->curr_working_dir);
     string_copy(current_task->curr_working_dir, (char*)abs_path);
+
+    uart_puts("chdir: ");
+    uart_puts(abs_path);
+    uart_puts("\n");
 
     current_tf->x0 = 0;
     return 0;

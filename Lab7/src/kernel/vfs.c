@@ -172,7 +172,7 @@ int vfs_lookup(const char* pathname, struct vnode** target){
       // If not, return -1
       if(dir_node->v_ops->lookup(dir_node, &dir_node, component_name))
         return -1;
-      
+      // If the vnode is a mount point, go to the root of the mounted fs
       while(dir_node->mount)
         dir_node = dir_node->mount->root;
       // Get next component name

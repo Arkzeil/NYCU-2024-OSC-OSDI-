@@ -20,8 +20,8 @@
 
 // dir_t = 0, file_t = 1
 enum node_type{
-    dir_t,
-    file_t
+  dir_t,
+  file_t
 };
 
 struct vnode {
@@ -70,6 +70,7 @@ struct vnode_operations {
               const char* component_name);
 };
 // Don't define variables in headers. Put declarations in header and definitions in one of the .c files.
+// https://stackoverflow.com/questions/69908418/multiple-definition-of-first-defined-here-on-gcc-10-2-1-but-not-gcc-8-3-0
 // https://stackoverflow.com/questions/17764661/multiple-definition-of-linker-error
 extern struct mount* rootfs;
 extern struct filesystem filesystems[MAX_FS];

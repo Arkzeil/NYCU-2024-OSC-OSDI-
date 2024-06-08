@@ -8,14 +8,14 @@ int init_dev_uart(void){
 
 int dev_uart_write(struct file *file, const void *buf, my_uint64_t len){
     for(int i = 0; i < len; i++){
-        uart_putc(((char*)buf)[i]);
+        uart_irq_putc(((char*)buf)[i]);
     }
     return len;
 }
 
 int dev_uart_read(struct file *file, void *buf, my_uint64_t len){
     for(int i = 0; i < len; i++){
-        ((char*)buf)[i] = uart_getc();
+        ((char*)buf)[i] = uart_irq_getc();
     }
     return len;
 }

@@ -48,15 +48,15 @@ typedef struct task_struct{
     int status;
     int pid;
     int flag;
+    // VFS
+    char curr_working_dir[MAX_PATHNAME+1];
+    struct file* file_descriptors_table[MAX_FD+1];
     // signal
     signal_handler_t signal_handler[NR_SIGNALS + 1];
     int sigcount[NR_SIGNALS + 1];
     signal_handler_t cur_signal_handler;
     int signal_is_checking;
     process_context_t signal_saved_context;
-    // VFS
-    char curr_working_dir[MAX_PATHNAME+1];
-    struct file* file_descriptors_table[MAX_FD+1];
     // if this is not added, the signal handler might be corrupted. Still looking for reason
     int space[599];
     trap_frame_t tf;

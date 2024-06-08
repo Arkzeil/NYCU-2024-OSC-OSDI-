@@ -13,7 +13,7 @@ int initramfs_register(){
 
 int initramfs_setup_mount(struct filesystem *fs, struct mount *mount){
     mount->fs = fs;
-    mount->root = initramfs_create_vnode(mount, dir_t);
+    mount->root = initramfs_create_vnode(0, dir_t);
     
     struct initramfs_inode* root_inode = (struct initramfs_inode*)mount->root->internal;
 
@@ -40,6 +40,11 @@ int initramfs_setup_mount(struct filesystem *fs, struct mount *mount){
         file_inode->name = (char*)(temp_addr + sizeof(struct cpio_newc_header));
         file_inode->data = (char*)(temp_addr + sizeof(struct cpio_newc_header) + namesize + align_offset((sizeof(struct cpio_newc_header) + namesize), 4));
         
+        uart_puts("\n\n");
+        uart_puts("initramfs_setup_mount: ");
+        uart_puts(file_inode->name);
+        uart_puts("\n\n");
+
         root_inode->entry[index++] = file_vnode;
         
         temp_addr += (sizeof(struct cpio_newc_header) + namesize + filesize + align_offset((sizeof(struct cpio_newc_header) + namesize), 4) + align_offset(filesize, 4));
