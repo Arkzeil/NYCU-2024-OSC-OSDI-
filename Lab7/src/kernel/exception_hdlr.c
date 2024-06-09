@@ -119,13 +119,13 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
             val = close((int)current_tf->x0);
             break;
         case 13:
-            uart_b2x_64((unsigned long long)syscall_num);
-            uart_putc('\n');
+            // uart_b2x_64((unsigned long long)syscall_num);
+            // uart_putc('\n');
             val = write((int)current_tf->x0, (const void *)current_tf->x1, (unsigned long)current_tf->x2);
             break;
         case 14:
-            uart_b2x_64((unsigned long long)syscall_num);
-            uart_putc('\n');
+            // uart_b2x_64((unsigned long long)syscall_num);
+            // uart_putc('\n');
             val = read((int)current_tf->x0, (void *)current_tf->x1, (unsigned long)current_tf->x2);
             break;
         case 15:
@@ -144,8 +144,8 @@ int c_system_call_handler(trap_frame_t *tf, my_uint64_t args){
             val = chdir((const char *)current_tf->x0);
             break;
         case 18:   
-            uart_b2x_64((unsigned long long)syscall_num);
-            uart_putc('\n');
+            // uart_b2x_64((unsigned long long)syscall_num);
+            // uart_putc('\n');
             val = lseek64((int)current_tf->x0, (long)current_tf->x1, (int)current_tf->x2);
             break;
         case 19:

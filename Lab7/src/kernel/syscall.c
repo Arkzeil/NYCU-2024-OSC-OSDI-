@@ -208,9 +208,9 @@ int open(const char *pathname, int flags){
     string_copy(abs_path, (char*)pathname);
     get_absolute_path(abs_path, current_task->curr_working_dir);
 
-    uart_puts("open: ");
-    uart_puts(abs_path);
-    uart_puts("\n");
+    // uart_puts("open: ");
+    // uart_puts(abs_path);
+    // uart_puts("\n");
 
     for(int i = 0; i < MAX_FD; i++){
         // find a empty file descriptor
@@ -241,9 +241,9 @@ int open(const char *pathname, int flags){
 
 // syscall number : 12
 int close(int fd){
-    uart_puts("close: ");
-    uart_itoa(fd);
-    uart_puts("\n");
+    // uart_puts("close: ");
+    // uart_itoa(fd);
+    // uart_puts("\n");
 
     if(current_task->file_descriptors_table[fd] != 0){
         vfs_close(current_task->file_descriptors_table[fd]);
@@ -260,11 +260,11 @@ int close(int fd){
 // syscall number : 13
 // remember to return read size or error code
 long write(int fd, const void *buf, unsigned long count){
-    uart_puts("write: ");
-    uart_puts(buf);
-    uart_puts(" to fd: ");
-    uart_itoa(fd);
-    uart_puts("\n");
+    // uart_puts("write: ");
+    // uart_puts(buf);
+    // uart_puts(" to fd: ");
+    // uart_itoa(fd);
+    // uart_puts("\n");
 
     if(current_task->file_descriptors_table[fd] != 0){
         current_tf->x0 = vfs_write(current_task->file_descriptors_table[fd], buf, count);
@@ -279,10 +279,10 @@ long write(int fd, const void *buf, unsigned long count){
 // syscall number : 14
 // remember to return read size or error code
 long read(int fd, void *buf, unsigned long count){
-    uart_puts("read: ");
-    uart_puts("from fd: ");
-    uart_itoa(fd);
-    uart_puts("\n");
+    // uart_puts("read: ");
+    // uart_puts("from fd: ");
+    // uart_itoa(fd);
+    // uart_puts("\n");
     if(current_task->file_descriptors_table[fd] != 0){
         current_tf->x0 = vfs_read(current_task->file_descriptors_table[fd], buf, count);
         return current_tf->x0;
@@ -370,12 +370,12 @@ extern unsigned int isrgb;
 // syscall number : 19
 int ioctl(int fd, unsigned long request, void *info){
 
-    uart_puts("ioctl: ");
-    uart_puts("fd: ");
-    uart_itoa(fd);
-    uart_puts(" request: ");
-    uart_itoa(request);
-    uart_puts("\n");
+    // uart_puts("ioctl: ");
+    // uart_puts("fd: ");
+    // uart_itoa(fd);
+    // uart_puts(" request: ");
+    // uart_itoa(request);
+    // uart_puts("\n");
     if(request == 0){
         ((struct framebuffer_info*)info)->width = width;
         ((struct framebuffer_info*)info)->height = height;

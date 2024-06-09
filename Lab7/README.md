@@ -15,6 +15,7 @@
     3. 
 ## Advanced Exercises
 ### Advanced Exercise 1 - /dev/uart
++ My process PCB will lead to content corruption if the elements inside is placed wrong, need more study
 ### Advanced Exercise 2 - /dev/framebuffer
 
 
