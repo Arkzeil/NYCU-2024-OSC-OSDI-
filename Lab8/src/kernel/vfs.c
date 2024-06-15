@@ -235,7 +235,6 @@ void init_rootfs(void){
   vfs_mount("/initramfs", "initramfs");
 
   vfs_mkdir("/boot");
-  
 
   // create /dev directory
   vfs_mkdir("/dev");

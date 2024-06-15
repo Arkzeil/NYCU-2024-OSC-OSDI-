@@ -2,8 +2,25 @@
 #define FAT32_H
 
 #include "kernel/vfs.h"
+#include "kernel/list.h"
+#include "kernel/sdhost.h"
+#include "kernel/fat32_utils.h"
+
+// ref: https://hackmd.io/@qy8LSFGCTDuQxhmEoSZjKQ/B1GPtg3YO
+
+#define BLOCK_SIZE 512
+#define CLUSTER_ENTTY_PER_BLOCK (BLOCK_SIZE / sizeof(struct dir_entry))
+
+#define ATTR_READ_ONLY  0x01
+#define ATTR_HIDDEN     0x02
+#define ATTR_SYSTEM     0x04
+#define ATTR_VOLUME_ID  0x08
+#define ATTR_DIRECTORY  0x10
+#define ATTR_ARCHIVE    0x20
+#define ATTR_LONG_NAME  0x0F
+
 // ref: https://en.wikipedia.org/wiki/Master_boot_record
-// patition table entry
+// patition table entry in MBR
 typedef struct partition{
     unsigned char status;           // 0x80: bootable, 0x00: not bootable
     unsigned char chs_start[3];     // Cylinder-head-sector address of the first block in the partition(head->sector->cylinder)
@@ -11,9 +28,10 @@ typedef struct partition{
     unsigned char chs_end[3];       // Cylinder-head-sector address of the last block in the partition((head->sector->cylinder))
     unsigned int lba;               // Logical block address of the first block in the partition
     unsigned int size;              // Size of the partition in sectors
-}__attribute__((packed)) partition_t;
+}__attribute__((packed)) mbr_partition_t;
 
 // ref: https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#BPB
+// Boot Sector in FAT32
 typedef struct boot_sector{
     unsigned char jmp[3];
     unsigned char oem[8];
@@ -31,7 +49,7 @@ typedef struct boot_sector{
     unsigned short head_side_count;     // Number of heads or sides of storage device, Number of heads for disks with INT 13h CHS geometry,[4] e.g., 2 for a double sided floppy.
     unsigned int hidden_sectors;        // Count of hidden sectors preceding the partition that contains this FAT volume( This field should always be zero on media that are not partitioned)
     unsigned int total_sectors_long;    // Total logical sectors including hidden sectors. If greater than 65535, use 4 byte value at offset 0x028(Total logical sectors (if greater than 65535; otherwise, see offset 0x013). )
-    // Extended BPB
+    // FAT32 Extended BPB
     unsigned int sectors_per_fat32;      // Sectors per FAT for FAT32
     unsigned short flags;                // Flags
     unsigned short version;              // Version
@@ -39,15 +57,23 @@ typedef struct boot_sector{
     unsigned short fsinfo_sector;        // Sector number of FSINFO structure for FAT32
     unsigned short backup_boot_sector;   // Sector number of a copy of the boot record for FAT32
     unsigned char reserved[12];          // Reserved
+    // Extended BPB
     unsigned char drive_number;          // Drive number
     unsigned char reserved1;             // Reserved1
     unsigned char boot_signature;        // Extended boot signature
     unsigned int volume_id;              // Volume ID
-    unsigned char volume_label[11];               // Volume label
-    unsigned char fs_type[8];                     // File system type
-    //char boot_code[420];                 // Boot code
-    unsigned short boot_sector_signature; // Boot sector signature 0x55 0xAA
-}__attribute__((packed)) boot_sector_t;
+    unsigned char volume_label[11];      // Volume label
+    unsigned char fs_type[8];            // File system type
+    //char boot_code[420];               // Boot code
+    unsigned short boot_sector_signature;// Boot sector signature 0x55 0xAA
+}__attribute__((packed)) fat32_boot_sector_t;
+
+typedef struct fat32_info{
+    fat32_boot_sector_t bs;           // Boot sector
+    unsigned int fat_lba;       // FAT region lba
+    unsigned int cluster_lba;   // data region lba
+}fat32_info_t;
+
 // ref: https://en.wikipedia.org/wiki/Design_of_the_FAT_file_system#FAT32
 // SFN
 typedef struct dir_entry{
@@ -68,13 +94,70 @@ typedef struct dir_entry{
 // LFN
 typedef struct dir_long_entry{
     unsigned char order;            // The order of this entry in the sequence of long dir entries
-    unsigned short name1[5];        // Characters 1-5 of the long-name sub-component in this entry
+    unsigned char name1[10];        // Characters 1-5 of the long-name sub-component in this entry
     unsigned char attr;             // ATTR_LONG_NAME
     unsigned char type;             // 0
     unsigned char checksum;         // Checksum of the name in the short dir entry
-    unsigned short name2[6];        // Characters 6-11 of the long-name sub-component in this entry
+    unsigned char name2[12];        // Characters 6-11 of the long-name sub-component in this entry
     unsigned short start_cluster;   // Must be 0
-    unsigned short name3[2];        // Characters 12-13 of the long-name sub-component in this entry
+    unsigned char name3[4];        // Characters 12-13 of the long-name sub-component in this entry
 }__attribute__((packed)) dir_long_entry_t;
+
+typedef struct fat32_cluster_entry{
+    union{
+        unsigned int value;
+        // for the first 4 bits, it's reserved(little-endian)
+        struct {
+            unsigned int idx: 28;
+            unsigned int reserved: 4;
+        };
+    };
+}fat32_cluster_entry_t;
+
+typedef struct fat32_mount{
+    struct list_head list;
+    struct mount *mount;
+}fat32_mount_t;
+// a list to store the directory entries
+typedef struct fat32_dir_list{
+    struct list_head list;
+}fat32_dir_list_t;
+// a list to store the file sizes
+typedef struct fat32_file_list{
+    struct list_head list;
+    unsigned int size;
+}fat32_file_list_t;
+
+struct fat32_inode{
+    // make it a list
+    struct list_head list;
+    char *name;
+    struct vnode *vnode;
+    fat32_info_t *info;
+    unsigned int cluster_num;
+    enum node_type type;
+    union{
+        fat32_dir_list_t *dir;
+        fat32_file_list_t *file;
+    };
+};
+
+int fat32_register();
+int fat32_setup_mount(struct filesystem *fs, struct mount *mount);
+
+struct vnode* fat32_create_vnode(struct mount* mount, enum node_type type);
+
+int fat32_write(struct file *file, const void *buf, my_uint64_t len);
+int fat32_read(struct file *file, void *buf, my_uint64_t len);
+int fat32_open(struct vnode *file_node, struct file **target);
+int fat32_close(struct file *file);
+int fat32_lseek64(struct file *file, long offset, int whence);
+
+my_uint64_t fat32_getsize(struct vnode *vd);
+
+int fat32_lookup(struct vnode *dir_node, struct vnode **target, const char *component_name);
+int fat32_create(struct vnode *dir_node, struct vnode **target, const char *component_name);
+int fat32_mkdir(struct vnode *dir_node, struct vnode **target, const char *component_name);
+
 
 #endif
