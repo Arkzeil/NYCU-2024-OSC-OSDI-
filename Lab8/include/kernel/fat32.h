@@ -9,15 +9,18 @@
 // ref: https://hackmd.io/@qy8LSFGCTDuQxhmEoSZjKQ/B1GPtg3YO
 
 #define BLOCK_SIZE 512
-#define CLUSTER_ENTTY_PER_BLOCK (BLOCK_SIZE / sizeof(struct dir_entry))
+#define CLUSTER_ENTTY_PER_BLOCK (BLOCK_SIZE / sizeof(struct fat32_cluster_entry))
+#define DIR_ENTRY_PER_BLOCK (BLOCK_SIZE / sizeof(struct dir_entry))
 
 #define ATTR_READ_ONLY  0x01
 #define ATTR_HIDDEN     0x02
 #define ATTR_SYSTEM     0x04
 #define ATTR_VOLUME_ID  0x08
 #define ATTR_DIRECTORY  0x10
-#define ATTR_ARCHIVE    0x20
+#define ATTR_ARCHIVE    0x20    // Typically set by the operating system as soon as the file is created or modified to mark the file as "dirty", and reset by backup software once the file has been backed up to indicate "pure" state.
 #define ATTR_LONG_NAME  0x0F
+
+
 
 // ref: https://en.wikipedia.org/wiki/Master_boot_record
 // patition table entry in MBR
@@ -114,6 +117,16 @@ typedef struct fat32_cluster_entry{
     };
 }fat32_cluster_entry_t;
 
+typedef struct file_name{
+    union {
+        unsigned char full_name[256];
+        struct{
+            unsigned char name[13];
+        } part[20];  
+    };
+}__attribute__((packed)) file_name_t;
+
+
 typedef struct fat32_mount{
     struct list_head list;
     struct mount *mount;
@@ -145,7 +158,7 @@ struct fat32_inode{
 int fat32_register();
 int fat32_setup_mount(struct filesystem *fs, struct mount *mount);
 
-struct vnode* fat32_create_vnode(struct mount* mount, enum node_type type);
+struct vnode* fat32_create_vnode(struct vnode* parent, const char *name, unsigned int type, unsigned int cluster_num, unsigned int size);
 
 int fat32_write(struct file *file, const void *buf, my_uint64_t len);
 int fat32_read(struct file *file, void *buf, my_uint64_t len);

@@ -8,6 +8,6 @@ int fat32_getsize(struct vnode *vd);
 int fat32_isdir(struct vnode *vd);
 
 int fat32_get_next_cluster(unsigned int lba, int cluster_number);
-int alloc_cluster(fat32_info_t *info, unsigned int cluster_num);
+int alloc_cluster(fat32_info_t *info, unsigned int prev_cluster_num);
 
 #endif

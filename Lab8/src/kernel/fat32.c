@@ -77,14 +77,40 @@ int fat32_setup_mount(struct filesystem *fs, struct mount *mount){
     return 0;
 }
 
-struct vnode* fat32_create_vnode(struct mount* mount, enum node_type type){
+struct vnode* fat32_create_vnode(struct vnode* parent, const char *name, unsigned int type, unsigned int cluster_num, unsigned int size){
     struct vnode *node = (struct vnode*)pool_alloc(sizeof(struct vnode));
+    struct fat32_inode *parent_inode = parent->internal;
     struct fat32_inode *inode = (struct fat32_inode*)pool_alloc(sizeof(struct fat32_inode));
-    node->mount = mount;
+    char buf = pool_alloc(string_len(name) + 1);
+
+    string_copy(buf, name);
+
+    inode->name = buf;
+    inode->vnode = node;
+    inode->info = parent_inode->info;
+    inode->cluster_num = cluster_num;
+    inode->type = type;
+
+    if(type == dir_t){
+        fat32_dir_list_t *dir = pool_alloc(sizeof(fat32_dir_list_t));
+        INIT_LIST_HEAD(&dir->list);
+        inode->dir = dir;
+    }
+    else{
+        fat32_file_list_t *file = pool_alloc(sizeof(fat32_file_list_t));
+        INIT_LIST_HEAD(&file->list);
+        file->size = size;
+        inode->file = file;
+    }
+
+    node->mount = parent->mount;
     node->v_ops = &fat32_v_ops;
     node->f_ops = &fat32_f_ops;
     node->internal = inode;
-    inode->type = type;
+    node->parent = parent;
+    // attach to parent's dir_t or file_t list
+    list_add(&inode->list, &parent_inode->dir->list);
+
     return node;
 }
 
@@ -115,57 +141,150 @@ dir_entry_t *fat32_lookup_dir(struct vnode *dir_node, const char *component_name
     struct fat32_inode *dir_inode = (struct fat32_inode*)dir_node->internal;
     fat32_info_t *info = dir_inode->info;
     unsigned int cluster_num = dir_inode->cluster_num;
-    unsigned int lba = info->cluster_lba + (cluster_num - 2) * info->bs.sectors_per_cluster; // get the lba of the cluster(it starts from 2)
+    unsigned int lba;
     unsigned int offset = 0;
     unsigned int size = 0;
     unsigned int i = 0;
     dir_entry_t *entry;
-    char *name;
+    file_name_t name;
+    short found = 0;
+    short dir_end = 0;
+    short LFN = 0;
 
-    // read the first block of the cluster
-    readblock(lba, buf);
-    // get the first entry
-    entry = (dir_entry_t*)buf;
-    // find the entry
-    while(entry->name[0] != 0){
-        if(entry->name[0] == 0xE5){
-            entry++;
-            continue;
+    while(1){
+        lba = info->cluster_lba + (cluster_num - 2) * info->bs.sectors_per_cluster; // get the lba of the cluster(it starts from 2)
+        // read the first block of the cluster
+        readblock(lba, buf);
+        // find the entry
+        for(int i = 0; i < DIR_ENTRY_PER_BLOCK; i++){
+            // get the i_th entry
+            entry = (dir_entry_t*)(&buf[sizeof(dir_entry_t) * i]);
+
+            if(entry->name[0] == 0x0){
+                dir_end = 1;
+                break;
+            }
+            // check if it's a long entry
+            if((entry->attr & 0x0F) == 0x0F){
+                // Get the sequence number of LFN by accessing first byte of SFN
+                // the sequence number is the first 6 bits of the first byte
+                // and the sequence number starts from 1
+                int n = (entry->name[0] & 0x3F) - 1;
+                LFN = 1;
+                dir_long_entry_t *long_entry = (dir_long_entry_t*)entry;
+                // Since a UCS-2(unicode) is 2 bytes(chars), we seemed only need the first byte(little endian)?
+                // so we add index by 2 and divide the index by 2
+                for(int j = 0; long_entry->name1[j] != 0xFF && j < 10; j+=2)
+                    name.part[n].name[j / 2] = long_entry->name1[j];
+
+                for(int j = 0; long_entry->name2[j] != 0xFF && j < 12; j+=2)
+                    name.part[n].name[5 + j / 2] = long_entry->name2[j];
+                
+                for(int j = 0; long_entry->name3[j] != 0xFF && j < 4; j+=2)
+                    name.part[n].name[11 + j / 2] = long_entry->name3[j];
+
+                continue;
+            }
+            if(LFN){
+                if(string_icase_comp(name.full_name, component_name) == 0){
+                    found = 1;
+                    break;
+                }
+                LFN = 0;
+                memset(&name, 0, sizeof(file_name_t));
+                continue;
+            }
+
+            LFN = 0;
+            // if it's SFN, we need to check the filename and extension
+            unsigned int len = 8;
+            // find the length of the filename by checking the space
+            while(len){
+                if(entry->name[len - 1] == ' ')
+                    len--;
+                else
+                    break;
+            }
+            
+            memcpy(name.full_name, entry->name, len);
+
+            len = 3;
+            // find the length of the extension by checking the space
+            while(len){
+                if(entry->ext[len - 1] == ' ')
+                    len--;
+                else
+                    break;
+            }
+            if(len >= 0){
+                string_concat(name.full_name, ".");
+                string_concat_n(name.full_name, entry->ext, len);
+            }
+
+            if(string_icase_comp(name.full_name, component_name) == 0){
+                found = 1;
+                break;
+            }
+
+            memset(&name, 0, sizeof(file_name_t));
         }
-        if(entry->attr == 0x0F){
-            dir_long_entry_t *long_entry = (dir_long_entry_t*)entry;
-            if(long_entry->order & 0x40){
-                offset = (long_entry->order & 0x3F) - 1;
-                size = 0;
-                name = long_entry->name1;
-            }
-            else if(offset == (long_entry->order & 0x3F)){
-                name = long_entry->name1;
-            }
-            else{
-                uart_puts("fat32_lookup_dir: long entry error\n");
-                return 0;
-            }
-        }
-        else{
-            if(offset == 0){
-                name = entry->name;
-            }
-            else{
-                uart_puts("fat32_lookup_dir: short entry error\n");
-                return 0;
-            }
-        }
-        if(string_comp(name, component_name) == 0){
-            return entry;
-        }
-        entry++;
+        if(found)
+            break;
+
+        if(dir_end)
+            break;
+
+        // get the next cluster
+        cluster_num = fat32_get_next_cluster(info->fat_lba, cluster_num);
+        // check if it's the end of the cluster chain
+        if(cluster_num >= 0x0FFFFFF8)
+            break;
     }
+
+    if(!found)
+        return 0;
+
+    return entry;
+}
+
+int fat32_lookup_no_cache(struct vnode *dir_node, struct vnode **target, const char *component_name){
+    struct vnode *node;
+    dir_entry_t *entry;
+    int cluster_num;
+    int type;
+    char buf[BLOCK_SIZE];
+
+    entry = fat32_lookup_dir(dir_node, component_name, buf);
+
+    if(entry == 0){
+        uart_puts("fat32_lookup_no_cache: file not found\n");
+        return -1;
+    }
+
+    if(!(entry->attr & (ATTR_DIRECTORY | ATTR_ARCHIVE))){
+        uart_puts("fat32_lookup_no_cache: not a directory or file\n");
+        return -1;
+    }
+
+    cluster_num = (entry->starthi << 16) | entry->startlow;
+
+    if(entry->attr & ATTR_ARCHIVE)
+        type = file_t;
+    else
+        type = dir_t;
+
+    node = fat32_create_vnode(dir_node, component_name, type, cluster_num, entry->size);
+    *target = node;
+
     return 0;
 }
 
 int fat32_lookup(struct vnode *dir_node, struct vnode **target, const char *component_name){
-
+    if(((struct fat32_inode*)dir_node->internal)->type != dir_t){
+        uart_puts("fat32_lookup: not a directory\n");
+        return -1;
+    }
+    return fat32_lookup_no_cache(dir_node, target, component_name);
 }
 
 int fat32_create(struct vnode *dir_node, struct vnode **target, const char *component_name){

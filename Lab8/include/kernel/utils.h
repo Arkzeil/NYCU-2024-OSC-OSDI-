@@ -13,12 +13,15 @@ int string_len(const char* str);
 int string_comp(const char *str1, const char *str2);
 // string for cpio or those not end with '\0' but with same length, this one requires length
 int string_comp_l(const char *str1, const char *str2, int len);
+// case insensitive compare
+int string_icase_comp(const char *str1, const char *str2);
 // set a string to same value, it should under 127
 void string_set(char *str, int n, int size);
 // this is for preserving char array when passing as function parameter
 void string_copy(char *dst, char *src);
 void string_copy_n(char *dst, char *src, int n);
 void string_concat(char *dst, char *src);
+void string_concat_n(char *dst, char *src, int n);
 // used for cpio length conversion(hex->int dec), it needs string length 
 int h2i(const char *str, int len); 
 // return a offset value to let i aligned to 'align' format

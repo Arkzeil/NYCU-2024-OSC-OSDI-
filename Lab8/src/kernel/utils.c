@@ -56,6 +56,33 @@ int string_comp_l(const char *str1, const char *str2, int len){
     return 0;
 }
 
+int string_icase_comp(const char *str1, const char *str2){
+    char c1, c2;
+
+    while (1) {
+        c1 = *str1++;
+        c2 = *str2++;
+
+        if (!c1 || !c2) {
+            break;
+        }
+
+        if ('A' <= c1 && c1 <= 'Z') {
+            c1 |= 0x20;
+        }
+
+        if ('A' <= c2 && c2 <= 'Z') {
+            c2 |= 0x20;
+        }
+
+        if (c1 != c2) {
+            break;
+        }
+    }
+
+    return c1 - c2;
+}
+
 void string_set(char *str, int n, int size){
     int i;
     for(i = 0; i < size; i++)
@@ -82,6 +109,10 @@ void string_copy_n(char *dst, char *src, int n){
 
 void string_concat(char *dst, char *src){
     string_copy(dst + string_len(dst), src);
+}
+
+void string_concat_n(char *dst, char *src, int n){
+    string_copy_n(dst + string_len(dst), src, n);
 }
 
 int h2i(const char *str, int len){
