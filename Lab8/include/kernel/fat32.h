@@ -72,7 +72,7 @@ typedef struct boot_sector{
 }__attribute__((packed)) fat32_boot_sector_t;
 
 typedef struct fat32_info{
-    fat32_boot_sector_t bs;           // Boot sector
+    fat32_boot_sector_t bs;     // Boot sector
     unsigned int fat_lba;       // FAT region lba
     unsigned int cluster_lba;   // data region lba
 }fat32_info_t;
@@ -127,10 +127,20 @@ typedef struct file_name{
 }__attribute__((packed)) file_name_t;
 
 
-typedef struct fat32_mount{
+typedef struct fat32_mount_list{
     struct list_head list;
     struct mount *mount;
-}fat32_mount_t;
+}fat32_mount_list_t;
+
+typedef struct fat32_cache_metadata{
+    struct list_head list;
+    unsigned int offset;
+    unsigned int cluster_num;
+    unsigned int updated;
+    unsigned int dirty;
+    unsigned char buf[BLOCK_SIZE];
+};
+
 // a list to store the directory entries
 typedef struct fat32_dir_list{
     struct list_head list;
@@ -142,11 +152,11 @@ typedef struct fat32_file_list{
 }fat32_file_list_t;
 
 struct fat32_inode{
-    // make it a list
-    struct list_head list;
     char *name;
     struct vnode *vnode;
     fat32_info_t *info;
+    // make it a list
+    struct list_head list;
     unsigned int cluster_num;
     enum node_type type;
     union{

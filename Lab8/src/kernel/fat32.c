@@ -20,7 +20,7 @@ int fat32_setup_mount(struct filesystem *fs, struct mount *mount){
     mbr_partition_t *part;
     unsigned int lba;
     fat32_info_t *info;
-    fat32_mount_t *fat32_mount;
+    fat32_mount_list_t *fat32_mount;
     // read the first block of the disk
     readblock(0, buf);
 
@@ -40,7 +40,7 @@ int fat32_setup_mount(struct filesystem *fs, struct mount *mount){
     vnode = pool_alloc(sizeof(struct vnode));
     info = pool_alloc(sizeof(fat32_info_t));
     fat32 = pool_alloc(sizeof(struct fat32_inode));
-    fat32_mount = pool_alloc(sizeof(fat32_mount_t));
+    fat32_mount = pool_alloc(sizeof(fat32_mount_list_t));
 
     lba = part->lba;
     // read the first block of the partition
@@ -118,7 +118,9 @@ int fat32_write(struct file *file, const void *buf, my_uint64_t len){
     struct fat32_inode *inode = (struct fat32_inode*)file->vnode->internal;
 }
 
-int fat32_read(struct file *file, void *buf, my_uint64_t len){}
+int fat32_read(struct file *file, void *buf, my_uint64_t len){
+
+}
 
 int fat32_open(struct vnode *file_node, struct file **target){
     (*target)->vnode = file_node;
@@ -298,7 +300,7 @@ int fat32_create(struct vnode *dir_node, struct vnode **target, const char *comp
         return -1;
     }
 
-    *target = fat32_create_vnode(dir_node->mount, file_t);
+    *target = fat32_create_vnode(dir_node,component_name, file_t, -1, 0);
 
     return 0;
 }
@@ -314,7 +316,182 @@ int fat32_mkdir(struct vnode *dir_node, struct vnode **target, const char *compo
         return -1;
     }
 
-    *target = fat32_create_vnode(dir_node->mount, dir_t);
+    *target = fat32_create_vnode(dir_node, component_name, dir_t, -1, 0);
 
     return 0;
+}
+
+int fat32_write_file(){
+    
+}
+
+int fat32_read_file(){
+
+}
+
+// write data to the cache
+int fat32_write_cache(struct fat32_inode *data, my_uint64_t backoff, const unsigned char *buf, my_uint64_t buf_offset, unsigned int size, fat32_cache_metadata *metadata){
+    int write_size;
+    // if the cache is not updated, read the block from the disk
+    if(!metadata->updated){
+        fat32_info_t *info = data->info;
+        int lba = info->cluster_lba + (metadata->cluster_num - 2) * info->bs.sectors_per_cluster;
+        
+        readblock(lba, metadata->buf);
+        metadata->updated = 1;
+    }
+    // if the size is larger than the remaining block size, just write the remaining block to cache
+    if(size > BLOCK_SIZE - backoff)
+        write_size = BLOCK_SIZE - backoff;
+    else
+        write_size = size;
+
+    memcpy(&metadata->buf[backoff], &buf[buf_offset], write_size);
+
+    return write_size;
+}
+// write to cache and make the cache dirty for future sync
+int fat32_write_disk(struct fat32_inode *data, my_uint64_t backoff, const unsigned char *buf, my_uint64_t buf_offset, unsigned int size, unsigned int offset, unsigned int cluster_num){
+    struct list_head *pos = &data->file->list;
+    fat32_info_t *info = data->info;
+    fat32_cache_metadata *metadata = pool_alloc(sizeof(fat32_cache_metadata));
+    unsigned int lba, write_size;
+
+    if(size > BLOCK_SIZE - backoff)
+        write_size = BLOCK_SIZE - backoff;
+    else
+        write_size = size;
+
+    if(cluster_num >= 0x0FFFFFF8){
+        // should return error?
+        memset(metadata->buf, 0, BLOCK_SIZE);
+    }
+    else{
+        lba = info->cluster_lba + (cluster_num - 2) * info->bs.sectors_per_cluster;
+        readblock(lba, metadata->buf);
+    }
+
+    memcpy(&metadata->buf[backoff], &buf[buf_offset], write_size);
+
+    metadata->updated = 1;
+    metadata->dirty = 1;
+    metadata->offset = offset;
+    metadata->cluster_num = cluster_num;
+
+    list_add_tail(&metadata->list, pos);    // add the new block to the end of the cache list
+
+    return write_size;
+}
+
+// read data from the cache
+int fat32_read_cache(struct fat32_inode *data, my_uint64_t backoff, unsigned char *buf, my_uint64_t buf_offset, unsigned int size, fat32_cache_metadata *metadata){
+    int read_size;
+    // if the cache is not updated, read the block from the disk
+    if(!metadata->updated){
+        fat32_info_t *info = data->info;
+        int lba = info->cluster_lba + (metadata->cluster_num - 2) * info->bs.sectors_per_cluster;
+        
+        readblock(lba, metadata->buf);
+        metadata->updated = 1;
+    }
+    // if the size is larger than the remaining block size, just read the remaining block from cache
+    if(size > BLOCK_SIZE - backoff)
+        read_size = BLOCK_SIZE - backoff;
+    else
+        read_size = size;
+
+    memcpy(&buf[buf_offset], &metadata->buf[backoff], read_size);
+
+    return read_size;
+}
+
+int fat32_read_disk(struct fat32_inode *data, my_uint64_t backoff, unsigned char *buf, my_uint64_t buf_offset, unsigned int size, unsigned int offset, unsigned int cluster_num){
+    struct list_head *pos = &data->file->list;
+    fat32_info_t *info = data->info;
+    fat32_cache_metadata *metadata = pool_alloc(sizeof(fat32_cache_metadata));
+    unsigned int lba, read_size;
+
+    if(size > BLOCK_SIZE - backoff)
+        read_size = BLOCK_SIZE - backoff;
+    else
+        read_size = size;
+
+    lba = info->cluster_lba + (cluster_num - 2) * info->bs.sectors_per_cluster;
+    readblock(lba, metadata->buf);
+
+    memcpy(&buf[buf_offset], &metadata->buf[backoff], read_size);
+
+    metadata->updated = 1;
+    metadata->offset = offset;
+    metadata->cluster_num = cluster_num;
+
+    list_add_tail(&metadata->list, pos);    // add the new block to the end of the cache list
+
+    return read_size;
+}
+// using the inode and the offset to find the cache metadata
+int fat32_seek_cache(struct fat32_inode *data, unsigned int offset, fat32_cache_metadata **metadata){
+    fat32_cache_metadata *temp;
+    // get the list of the 
+    struct list_head *pos = &data->file->list;
+
+    if(list_empty(pos)){
+        uart_puts("fat32_seek_cache: cache list is empty\n");
+        return -1;
+    }
+
+    list_for_each_entry(temp, pos, list){
+        metadata = temp;
+        if(temp->offset == offset){ // if the offset is the same, return the metadata
+            *metadata = temp;
+            return 0;
+        }
+    }
+
+    return -1;
+}
+// using the inode and the offset to find the data on disk,and create a new corresponding cache
+int fat32_seek_disk(struct fat32_inode *data, unsigned int offset, unsigned int cluster_num, fat32_cache_metadata **metadata){
+    fat32_info_t *info = data->info;
+    unsigned int current_offset, current_cluster_num;
+    // if the metadata is not empty(exist in cache), get the offset and cluster number
+    if(*metadata){
+        current_offset = (*metadata)->offset;
+        current_cluster_num = (*metadata)->cluster_num;
+
+        if(current_offset == offset)
+            return 0;
+        
+        current_offset++;
+        current_cluster_num = fat32_get_next_cluster(info->fat_lba, current_cluster_num);
+
+        if(current_cluster_num >= 0x0FFFFFF8)
+            return -1;
+    }
+    else{
+        current_offset = 0;
+        current_cluster_num = cluster_num;
+    }
+    // create a new block in cache
+    while(1){
+        fat32_cache_metadata *temp = pool_alloc(sizeof(fat32_cache_metadata));
+
+        temp->offset = current_offset;
+        temp->cluster_num = current_cluster_num;
+        temp->updated = 0;
+        temp->dirty = 1;
+        // put the new block to the end of the list of cache
+        list_add_tail(&temp->list, &data->file->list);
+
+        *metadata = temp;
+
+        if(current_offset == offset)
+            return 0;
+
+        current_offset++;
+        current_cluster_num = fat32_get_next_cluster(info->fat_lba, current_cluster_num);
+
+        if(current_cluster_num >= 0x0FFFFFF8)
+            return -1;
+    }
 }
