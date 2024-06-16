@@ -137,9 +137,7 @@ int fat32_lseek64(struct file *file, long offset, int whence){
 
 }
 
-my_uint64_t fat32_getsize(struct vnode *vd){}
-
-dir_entry_t *fat32_lookup_dir(struct vnode *dir_node, const char *component_name, char *buf){
+dir_entry_t *fat32_lookup_dir(struct vnode *dir_node, const char *component_name, char *buf, int *buf_lba){
     struct fat32_inode *dir_inode = (struct fat32_inode*)dir_node->internal;
     fat32_info_t *info = dir_inode->info;
     unsigned int cluster_num = dir_inode->cluster_num;
@@ -157,6 +155,10 @@ dir_entry_t *fat32_lookup_dir(struct vnode *dir_node, const char *component_name
         lba = info->cluster_lba + (cluster_num - 2) * info->bs.sectors_per_cluster; // get the lba of the cluster(it starts from 2)
         // read the first block of the cluster
         readblock(lba, buf);
+        // called by sync, to updata buffer lba
+        if(buf_lba)
+            *buf_lba = lba;
+
         // find the entry
         for(int i = 0; i < DIR_ENTRY_PER_BLOCK; i++){
             // get the i_th entry
@@ -256,7 +258,7 @@ int fat32_lookup_no_cache(struct vnode *dir_node, struct vnode **target, const c
     int type;
     char buf[BLOCK_SIZE];
 
-    entry = fat32_lookup_dir(dir_node, component_name, buf);
+    entry = fat32_lookup_dir(dir_node, component_name, buf, 0);
 
     if(entry == 0){
         uart_puts("fat32_lookup_no_cache: file not found\n");
@@ -321,16 +323,107 @@ int fat32_mkdir(struct vnode *dir_node, struct vnode **target, const char *compo
     return 0;
 }
 
-int fat32_write_file(){
-    
+int fat32_write_file(const void *buf, struct fat32_inode *data, unsigned int offset, my_uint64_t size){
+    fat32_cache_metadata_t *metadata = 0;
+    struct list_head *head = &data->file->list;
+    unsigned int first_block = offset / BLOCK_SIZE;
+    unsigned int current_block = 0;
+    unsigned int cluster_num = data->cluster_num;
+    my_uint64_t buf_offset = 0;
+    int ret = 0;    // store return value
+    int written = 0;
+    // see if it can find the block in cache
+    ret = fat32_seek_cache(data, first_block, &metadata);
+    // if it can't find the block in cache, read the block from disk
+    if(ret < 0)
+        ret = fat32_seek_disk(data, first_block, cluster_num, &metadata);
+    if(ret < 0){
+        uart_puts("fat32_write_file: seek error\n");
+        return 0;
+    }
+
+    while(size){
+        my_uint64_t backoff = (offset + written) % BLOCK_SIZE;
+
+        if(&metadata->list != head){
+            // if the block is in cache, write the data to the cache
+            ret = fat32_write_cache(data, backoff, buf, buf_offset, size, metadata);
+            cluster_num = metadata->cluster_num;
+            // find the next block in cache
+            metadata = list_first_entry(&metadata->list, fat32_cache_metadata_t, list);
+        }
+        else{
+            // if the block is not in cache. Read block from sdcard, create cache, then write it
+            cluster_num = fat32_get_next_cluster(data->info->fat_lba, cluster_num);
+            if(cluster_num >= 0x0FFFFFF8)
+                break;
+            ret = fat32_write_disk(data, backoff, buf, buf_offset, size, current_block, cluster_num);
+        }
+
+        if(ret < 0)
+            break;
+        
+        buf_offset += ret;
+        written += ret;
+        current_block++;
+        size -= ret;
+    }
+
+    return written;
 }
 
-int fat32_read_file(){
+int fat32_read_file(void *buf, struct fat32_inode *data, unsigned int offset, my_uint64_t size){
+    fat32_cache_metadata_t *metadata = 0;
+    struct list_head *head = &data->file->list;
+    unsigned int first_block = offset / BLOCK_SIZE;
+    unsigned int current_block = 0;
+    unsigned int cluster_num = data->cluster_num;
+    my_uint64_t buf_offset = 0;
+    int ret = 0;    // store return value
+    int read = 0;
+    // see if it can find the block in cache
+    ret = fat32_seek_cache(data, first_block, &metadata);
+    // if it can't find the block in cache, read the block from disk
+    if(ret < 0)
+        ret = fat32_seek_disk(data, first_block, cluster_num, &metadata);
+    if(ret < 0){
+        uart_puts("fat32_read_file: seek error\n");
+        return 0;
+    }
 
+    while(size){
+        my_uint64_t backoff = (offset + read) % BLOCK_SIZE;
+
+        if(&metadata->list != head){
+            // if the block is in cache, read the data from the cache
+            ret = fat32_read_cache(data, backoff, buf, buf_offset, size, metadata);
+            cluster_num = metadata->cluster_num;
+            // find the next block in cache
+            metadata = list_first_entry(&metadata->list, fat32_cache_metadata_t, list);
+        }
+        else{
+            // if the block is not in cache. Read block from sdcard, create cache, then read it
+            cluster_num = fat32_get_next_cluster(data->info->fat_lba, cluster_num);
+            if(cluster_num >= 0x0FFFFFF8)
+                break;
+
+            ret = fat32_read_disk(data, backoff, buf, buf_offset, size, current_block, cluster_num);
+        }
+
+        if(ret < 0)
+            break;
+        
+        buf_offset += ret;
+        read += ret;
+        current_block++;
+        size -= ret;
+    }
+
+    return read;
 }
 
 // write data to the cache
-int fat32_write_cache(struct fat32_inode *data, my_uint64_t backoff, const unsigned char *buf, my_uint64_t buf_offset, unsigned int size, fat32_cache_metadata *metadata){
+int fat32_write_cache(struct fat32_inode *data, my_uint64_t backoff, const unsigned char *buf, my_uint64_t buf_offset, unsigned int size, fat32_cache_metadata_t *metadata){
     int write_size;
     // if the cache is not updated, read the block from the disk
     if(!metadata->updated){
@@ -354,7 +447,7 @@ int fat32_write_cache(struct fat32_inode *data, my_uint64_t backoff, const unsig
 int fat32_write_disk(struct fat32_inode *data, my_uint64_t backoff, const unsigned char *buf, my_uint64_t buf_offset, unsigned int size, unsigned int offset, unsigned int cluster_num){
     struct list_head *pos = &data->file->list;
     fat32_info_t *info = data->info;
-    fat32_cache_metadata *metadata = pool_alloc(sizeof(fat32_cache_metadata));
+    fat32_cache_metadata_t *metadata = pool_alloc(sizeof(fat32_cache_metadata_t));
     unsigned int lba, write_size;
 
     if(size > BLOCK_SIZE - backoff)
@@ -384,7 +477,7 @@ int fat32_write_disk(struct fat32_inode *data, my_uint64_t backoff, const unsign
 }
 
 // read data from the cache
-int fat32_read_cache(struct fat32_inode *data, my_uint64_t backoff, unsigned char *buf, my_uint64_t buf_offset, unsigned int size, fat32_cache_metadata *metadata){
+int fat32_read_cache(struct fat32_inode *data, my_uint64_t backoff, unsigned char *buf, my_uint64_t buf_offset, unsigned int size, fat32_cache_metadata_t *metadata){
     int read_size;
     // if the cache is not updated, read the block from the disk
     if(!metadata->updated){
@@ -408,7 +501,7 @@ int fat32_read_cache(struct fat32_inode *data, my_uint64_t backoff, unsigned cha
 int fat32_read_disk(struct fat32_inode *data, my_uint64_t backoff, unsigned char *buf, my_uint64_t buf_offset, unsigned int size, unsigned int offset, unsigned int cluster_num){
     struct list_head *pos = &data->file->list;
     fat32_info_t *info = data->info;
-    fat32_cache_metadata *metadata = pool_alloc(sizeof(fat32_cache_metadata));
+    fat32_cache_metadata_t *metadata = pool_alloc(sizeof(fat32_cache_metadata_t));
     unsigned int lba, read_size;
 
     if(size > BLOCK_SIZE - backoff)
@@ -430,8 +523,9 @@ int fat32_read_disk(struct fat32_inode *data, my_uint64_t backoff, unsigned char
     return read_size;
 }
 // using the inode and the offset to find the cache metadata
-int fat32_seek_cache(struct fat32_inode *data, unsigned int offset, fat32_cache_metadata **metadata){
-    fat32_cache_metadata *temp;
+// offset is the desired block number
+int fat32_seek_cache(struct fat32_inode *data, unsigned int offset, fat32_cache_metadata_t **metadata){
+    fat32_cache_metadata_t *temp;
     // get the list of the 
     struct list_head *pos = &data->file->list;
 
@@ -451,7 +545,7 @@ int fat32_seek_cache(struct fat32_inode *data, unsigned int offset, fat32_cache_
     return -1;
 }
 // using the inode and the offset to find the data on disk,and create a new corresponding cache
-int fat32_seek_disk(struct fat32_inode *data, unsigned int offset, unsigned int cluster_num, fat32_cache_metadata **metadata){
+int fat32_seek_disk(struct fat32_inode *data, unsigned int offset, unsigned int cluster_num, fat32_cache_metadata_t **metadata){
     fat32_info_t *info = data->info;
     unsigned int current_offset, current_cluster_num;
     // if the metadata is not empty(exist in cache), get the offset and cluster number
@@ -474,7 +568,7 @@ int fat32_seek_disk(struct fat32_inode *data, unsigned int offset, unsigned int 
     }
     // create a new block in cache
     while(1){
-        fat32_cache_metadata *temp = pool_alloc(sizeof(fat32_cache_metadata));
+        fat32_cache_metadata_t *temp = pool_alloc(sizeof(fat32_cache_metadata_t));
 
         temp->offset = current_offset;
         temp->cluster_num = current_cluster_num;
@@ -494,4 +588,282 @@ int fat32_seek_disk(struct fat32_inode *data, unsigned int offset, unsigned int 
         if(current_cluster_num >= 0x0FFFFFF8)
             return -1;
     }
+}
+
+void fat32_sync_dir(struct vnode *dir_node){
+    struct fat32_inode *data = (struct fat32_inode*)dir_node->internal; 
+    struct fat32_inode *entry;
+    struct list_head *head = &data->dir->list;
+    dir_entry_t *dir;
+    dir_long_entry_t *long_dir;
+    unsigned int cluster_num = data->cluster_num;
+    int lba;
+    int index = 0;
+    int long_file_index = 1;
+    unsigned char buf[BLOCK_SIZE];
+
+    if(cluster_num >= 0x0FFFFFF8){
+        uart_puts("fat32_sync_dir: end of cluster chain\n");
+        return;
+    }
+
+    lba = data->info->cluster_lba + (cluster_num - 2) * data->info->bs.sectors_per_cluster;
+    readblock(lba, buf);
+
+    list_for_each_entry(entry, head, list){
+        dir_entry_t *ori_dir;
+        const char *name = entry->name;
+        const char *ext;
+        int i;
+        int LFN, name_len, ext_pos, buf_lba;
+        unsigned char temp_buf[BLOCK_SIZE];
+        
+        ori_dir = fat32_lookup_dir(dir_node, name, temp_buf, &buf_lba);
+        // if the entry exist(old ffile), update its size
+        if(ori_dir){
+            if(entry->type == file_t){
+                ori_dir->size = entry->file->size;
+                writeblock(buf_lba, temp_buf);
+            }
+            continue;
+        }
+        // if the entry doesn't exist(new file), create a new entry
+        ext = 0;
+        ext_pos = -1;
+
+        do {
+            name_len = string_len(name);
+            if (name_len >= 13) {
+                LFN = 1;
+                break;
+            }
+            for (i = 0; i < name_len; i++) {
+                // get idx of extension name
+                if (name[name_len - 1 - i] == '.') {
+                    break;
+                }
+            }
+            if (i < name_len) {
+                ext = &name[name_len - i];
+                ext_pos = name_len - 1 - i;
+            }
+            if (i >= 4) {
+                LFN = 1;
+                break;
+            }
+            if (name_len - 1 - i > 8) {
+                // SFN: 8.3
+                LFN = 1;
+                break;
+            }
+
+            LFN = 0;
+        }while(0);
+
+        // Seek idx to the end of dir
+        while(1){
+            dir = (dir_entry_t*)(&buf[sizeof(dir_entry_t) * index]);
+            // if the entry is empty, break
+            if (dir->name[0] == 0){
+                break;
+            }
+
+            index++;
+
+            if (index >= 16) { // if idx is over Directory Entry, create a new one
+                unsigned int new_cluster_num;
+
+                writeblock(lba, buf);
+
+                new_cluster_num = get_next_cluster(data->info->fat_lba, cluster_num);
+                if (new_cluster_num >= 0x0FFFFFF8)
+                    new_cluster_num = alloc_cluster(data->info, cluster_num);
+                
+                cluster_num = new_cluster_num;
+
+                lba = data->info->cluster_lba + (cluster_num - 2) * data->info->bs.sectors_per_cluster;
+
+                readblock(lba, buf);
+                index = 0;
+            }
+        }
+
+        // Write LFN
+        if(LFN) {
+            int ord;
+            int first;
+
+            // the number of LFN entries required
+            ord = ((name_len - 1) / 13) + 1;
+            first = 0x40; // LAST_LONG_ENTRY flag in LFN LDIR_Ord
+
+            for (; ord > 0; --ord) {
+                int end;
+                long_dir = (struct long_dir_t *)(&buf[sizeof(dir_long_entry_t) * index]);
+
+                long_dir->order = first | ord;
+                long_dir->attr = ATTR_LONG_NAME;
+                long_dir->type = 0;
+                // TODO: Calculate checksum, SFN + LFN
+                long_dir->checksum = 0;
+                long_dir->start_cluster = 0;
+
+                first = 0;
+                end = 0;
+                // 1~10
+                for (i = 0; i < 10; i += 2) {
+                    if (end) { // padding 0xff if filename end
+                        long_dir->name1[i] = 0xff;
+                        long_dir->name1[i + 1] = 0xff;
+                    } else {
+                        long_dir->name1[i] = name[(ord - 1) * 13 + i / 2];
+                        long_dir->name1[i + 1] = 0;
+                        if (long_dir->name1[i] == 0) {
+                            end = 1;
+                        }
+                    }
+                }
+                // 11~22
+                for (i = 0; i < 12; i += 2) {
+                    if (end) {
+                        long_dir->name2[i] = 0xff;
+                        long_dir->name2[i + 1] = 0xff;
+                    } else {
+                        long_dir->name2[i] = name[(ord - 1) * 13 + 5 + i / 2];
+                        long_dir->name2[i + 1] = 0;
+                        if (long_dir->name2[i] == 0) {
+                            end = 1;
+                        }
+                    }
+                }
+                // 23~26
+                for (i = 0; i < 4; i += 2) {
+                    if (end) {
+                        long_dir->name3[i] = 0xff;
+                        long_dir->name3[i + 1] = 0xff;
+                    } else {
+                        long_dir->name3[i] = name[(ord - 1) * 13 + 11 + i / 2];
+                        long_dir->name3[i + 1] = 0;
+                        if (long_dir->name3[i] == 0) {
+                            end = 1;
+                        }
+                    }
+                }
+
+                index++;
+
+                if (index >= 16) {
+                    unsigned int newcid;
+
+                    writeblock(lba, buf);
+
+                    newcid = get_next_cluster(data->info->fat_lba, cluster_num);
+                    if (newcid >= 0x0FFFFFF8) {
+                        newcid = alloc_cluster(data->info, cluster_num);
+                    }
+
+                    cluster_num = newcid;
+
+                    lba = data->info->cluster_lba + (cluster_num - 2) * data->info->bs.sectors_per_cluster;
+                    readblock(lba, buf);
+
+                    index = 0;
+                }
+            }
+        }
+
+        // Write SFN
+        dir = (struct dir_t *)(&buf[sizeof(dir_entry_t) * index]);
+
+        // TODO: Set these properties properly
+        dir->lcase = 0;
+        dir->ctime_cs = 0;
+        dir->ctime = 0;
+        dir->cdate = 0;
+        dir->adate = 0;
+        dir->time = 0;
+        dir->date = 0;
+
+        if (entry->type == dir_t) {
+            dir->attr = ATTR_DIRECTORY;
+            dir->size = 0;
+        } else {
+            dir->attr = ATTR_ARCHIVE;
+            dir->size = entry->file->size;
+        }
+
+        if (entry->cluster_num >= 0x0FFFFFF8) {
+            entry->cluster_num = alloc_cluster(data->info, 0);
+        }
+
+        dir->starthi = (entry->cluster_num >> 16) & 0xffff;
+        dir->startlow = entry->cluster_num & 0xffff;
+
+        if (LFN) {
+            int lfni;
+
+            // Creating SFN body
+            // TODO: handle lfnidx
+            for (i = 7, lfni = long_file_index; i >= 0 && lfni;) {
+                dir->name[i--] = '0' + lfni % 10;
+                lfni /= 10;
+            }
+
+            long_file_index++;
+            // numeric-tail: ~n (1 <= n <= 6)
+            dir->name[i--] = '~';
+
+            // TODO: handle letter case
+            memcpy((void *)dir->name, name, i + 1);
+        } else {
+            // TODO: handle letter case
+            for (i = 0; i != ext_pos && name[i]; ++i) {
+                dir->name[i] = name[i];
+            }
+
+            for (; i < 8; ++i) {
+                dir->name[i] = ' '; // in SFN, each part is padded with space
+            }
+        }
+
+        // SFN format: 8.3
+        // TODO: handle letter case
+        for (i = 0; i < 3 && ext[i]; ++i) {
+            dir->name[8 + i] = ext[i];
+        }
+
+        for (; i < 3; ++i) {
+            dir->name[8 + i] = ' ';
+        }
+
+        index += 1;
+
+        if (index >= 16) {
+            int newcid;
+
+            writeblock(lba, buf);
+
+            newcid = get_next_cluster(data->info->fat_lba, cluster_num);
+            if (newcid >= 0x0FFFFFF8) {
+                newcid = alloc_cluster(data->info, cluster_num);
+            }
+
+            cluster_num = newcid;
+
+            lba = data->info->cluster_lba + (cluster_num - 2) * data->info->bs.sectors_per_cluster;
+
+            // TODO: Cache data block of directory
+            readblock(lba, buf);
+
+            index = 0;
+        }
+    }
+}
+
+void fat32_sync_file(struct vnode *file_node){
+
+}
+
+void fat32_sync_all(struct vnode *dir_node){
+
 }

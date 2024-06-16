@@ -139,7 +139,7 @@ typedef struct fat32_cache_metadata{
     unsigned int updated;
     unsigned int dirty;
     unsigned char buf[BLOCK_SIZE];
-};
+}fat32_cache_metadata_t;
 
 // a list to store the directory entries
 typedef struct fat32_dir_list{
@@ -176,11 +176,12 @@ int fat32_open(struct vnode *file_node, struct file **target);
 int fat32_close(struct file *file);
 int fat32_lseek64(struct file *file, long offset, int whence);
 
-my_uint64_t fat32_getsize(struct vnode *vd);
-
 int fat32_lookup(struct vnode *dir_node, struct vnode **target, const char *component_name);
 int fat32_create(struct vnode *dir_node, struct vnode **target, const char *component_name);
 int fat32_mkdir(struct vnode *dir_node, struct vnode **target, const char *component_name);
 
+void fat32_sync_dir(struct vnode *dir_node);
+void fat32_sync_file(struct vnode *file_node);
+void fat32_sync_all(struct vnode *dir_node);
 
 #endif
