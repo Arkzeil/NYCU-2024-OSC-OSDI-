@@ -5,10 +5,29 @@ struct list_head mounts;
 struct file_operations fat32_f_ops = {fat32_write, fat32_read, fat32_open, fat32_close, fat32_lseek64, fat32_getsize};
 struct vnode_operations fat32_v_ops = {fat32_lookup, fat32_create, fat32_mkdir};
 
+int fat32_lookup_cache(struct vnode *dir_node, struct vnode **target, const char *component_name);
+dir_entry_t *fat32_lookup_dir(struct vnode *dir_node, const char *component_name, char *buf, int *buf_lba);
+int fat32_lookup_no_cache(struct vnode *dir_node, struct vnode **target, const char *component_name);
+
+int fat32_write_file(const void *buf, struct fat32_inode *data, unsigned int offset, my_uint64_t size);
+int fat32_read_file(void *buf, struct fat32_inode *data, unsigned int offset, my_uint64_t size);
+
+int fat32_write_cache(struct fat32_inode *data, my_uint64_t backoff, const unsigned char *buf, my_uint64_t buf_offset, unsigned int size, fat32_cache_metadata_t *metadata);
+int fat32_write_disk(struct fat32_inode *data, my_uint64_t backoff, const unsigned char *buf, my_uint64_t buf_offset, unsigned int size, unsigned int offset, unsigned int cluster_num);
+
+int fat32_read_cache(struct fat32_inode *data, my_uint64_t backoff, unsigned char *buf, my_uint64_t buf_offset, unsigned int size, fat32_cache_metadata_t *metadata);
+int fat32_read_disk(struct fat32_inode *data, my_uint64_t backoff, unsigned char *buf, my_uint64_t buf_offset, unsigned int size, unsigned int offset, unsigned int cluster_num);
+
+int fat32_seek_cache(struct fat32_inode *data, unsigned int offset, fat32_cache_metadata_t **metadata);
+int fat32_seek_disk(struct fat32_inode *data, unsigned int offset, unsigned int cluster_num, fat32_cache_metadata_t **metadata);
+
 int fat32_register(){
     struct filesystem fs;
     fs.name = "fat32";
     fs.setup_mount = fat32_setup_mount;
+    fs.sync = fat32_sync_all;
+
+    INIT_LIST_HEAD(&mounts);
     return register_filesystem(&fs);
 }
 
@@ -25,12 +44,12 @@ int fat32_setup_mount(struct filesystem *fs, struct mount *mount){
     readblock(0, buf);
 
     // check boot signature
-    if(buf[0x1FE] != 0x55 && buf[0x1FF] != 0xAA ){
+    if(buf[0x1FE] != 0x55 || buf[0x1FF] != 0xAA ){
         uart_puts("fat32_setup_mount: boot signature error\n");
         return -1;
     }
     // get the first partition table
-    part = (mbr_partition_t*)(buf[0x1BE]);
+    part = (mbr_partition_t*)(&buf[0x1BE]);
     // check if it's a fat32 partition
     if(part->type != 0x0B && part->type != 0x0C){
         uart_puts("fat32_setup_mount: not a fat32 partition\n");
@@ -48,6 +67,8 @@ int fat32_setup_mount(struct filesystem *fs, struct mount *mount){
 
     memcpy(&info->bs, buf, sizeof(fat32_boot_sector_t));
 
+    INIT_LIST_HEAD(&fat32->list);
+
     info->fat_lba = lba + info->bs.reserved_sectors;
     info->cluster_lba = info->fat_lba + info->bs.sectors_per_fat32 * info->bs.fat_count;
     
@@ -59,7 +80,7 @@ int fat32_setup_mount(struct filesystem *fs, struct mount *mount){
     vnode->parent = root_vnode->parent;
     // set the new fat32 inode
     fat32->vnode = vnode;
-    fat32->type = dir_t;
+    fat32->type = FAT_DIR;
     fat32->info = info;
     fat32->cluster_num = 2;
     // set the root vnode with the new fat32 inode, and set the mount point
@@ -72,7 +93,7 @@ int fat32_setup_mount(struct filesystem *fs, struct mount *mount){
     list_add(&fat32_mount->list, &mounts);
     unlock();
 
-    fat32_mount = mount;
+    fat32_mount->mount = mount;
 
     return 0;
 }
@@ -81,9 +102,9 @@ struct vnode* fat32_create_vnode(struct vnode* parent, const char *name, unsigne
     struct vnode *node = (struct vnode*)pool_alloc(sizeof(struct vnode));
     struct fat32_inode *parent_inode = parent->internal;
     struct fat32_inode *inode = (struct fat32_inode*)pool_alloc(sizeof(struct fat32_inode));
-    char buf = pool_alloc(string_len(name) + 1);
+    char *buf = (char*)pool_alloc(string_len(name) + 1);
 
-    string_copy(buf, name);
+    string_copy(buf, (char*)name);
 
     inode->name = buf;
     inode->vnode = node;
@@ -91,7 +112,7 @@ struct vnode* fat32_create_vnode(struct vnode* parent, const char *name, unsigne
     inode->cluster_num = cluster_num;
     inode->type = type;
 
-    if(type == dir_t){
+    if(type == FAT_DIR){
         fat32_dir_list_t *dir = pool_alloc(sizeof(fat32_dir_list_t));
         INIT_LIST_HEAD(&dir->list);
         inode->dir = dir;
@@ -108,24 +129,116 @@ struct vnode* fat32_create_vnode(struct vnode* parent, const char *name, unsigne
     node->f_ops = &fat32_f_ops;
     node->internal = inode;
     node->parent = parent;
-    // attach to parent's dir_t or file_t list
+    // attach to parent's FAT_DIR or FAT_FILE list
     list_add(&inode->list, &parent_inode->dir->list);
 
     return node;
 }
 
+int alloc_cluster(fat32_info_t *info, unsigned int prev_cluster_num){
+    fat32_cluster_entry_t *entry;
+    int fat32_lba = info->fat_lba;
+    int cluster_number = 0;
+    short found;
+    char buf[BLOCK_SIZE];
+    // Find the first empty cluster
+    while(fat32_lba < info->cluster_lba){
+        readblock(fat32_lba, buf);
+        entry = (fat32_cluster_entry_t*)buf;
+
+        for(int i = 0; i < CLUSTER_ENTTY_PER_BLOCK; i++){
+            if(entry[i].value == 0){
+                found = 1;
+                break;
+            }
+            cluster_number++;
+        }
+
+        if(found){
+            break;
+        }
+
+        fat32_lba++;
+    }
+
+    if(!found){
+        uart_puts("alloc_cluster: No empty cluster\n");
+        return -1;
+    }
+
+    if(found && prev_cluster_num != 0){
+        unsigned target_lba = info->cluster_lba + prev_cluster_num / CLUSTER_ENTTY_PER_BLOCK;
+        unsigned target_index = prev_cluster_num % CLUSTER_ENTTY_PER_BLOCK;
+        readblock(target_lba, buf);
+        entry = (fat32_cluster_entry_t*)buf;
+        entry[target_index].value = cluster_number;
+        writeblock(target_lba, buf);
+    }
+
+    return cluster_number;
+}
+
 int fat32_write(struct file *file, const void *buf, my_uint64_t len){
-    struct fat32_inode *inode = (struct fat32_inode*)file->vnode->internal;
+    struct fat32_inode *inode = file->vnode->internal;
+    int file_size = fat32_getsize(file->vnode);
+    int ret;
+
+    if(fat32_isdir(file->vnode)){
+        uart_puts("fat32_write: cannot write to a directory\n");
+        return -1;
+    }
+    if(!len){
+        uart_puts("fat32_write: nothing to write\n");
+        return 0;
+    }
+
+    ret = fat32_write_file(buf, inode, file->f_pos, len);
+    if(ret < 0){
+        uart_puts("fat32_write: write error\n");
+        return -1;
+    }
+
+    file->f_pos += ret;
+    if(file->f_pos > file_size)
+        inode->file->size = file->f_pos;
+
+    return ret;
 }
 
 int fat32_read(struct file *file, void *buf, my_uint64_t len){
+    struct fat32_inode *inode = file->vnode->internal;
+    int file_size = fat32_getsize(file->vnode);
+    int ret;
 
+    if(fat32_isdir(file->vnode)){
+        uart_puts("fat32_read: cannot read a directory\n");
+        return -1;
+    }
+    if(file->f_pos + len > file_size)
+        len = file_size - file->f_pos;
+    if(!len){
+        uart_puts("fat32_read: nothing to read\n");
+        return 0;
+    }
+
+    ret = fat32_read_file(buf, inode, file->f_pos, len);
+    if(ret <= 0){
+        uart_puts("fat32_read: read error\n");
+        return -1;
+    }
+
+    file->f_pos += ret;
+
+    return ret;
 }
 
 int fat32_open(struct vnode *file_node, struct file **target){
     (*target)->vnode = file_node;
     (*target)->f_pos = 0;
     (*target)->f_ops = file_node->f_ops;
+    uart_puts("open:");
+    uart_puts(((struct fat32_inode*)(file_node->internal))->name);
+    uart_puts("\n");
     return 0;
 }
 
@@ -133,8 +246,56 @@ int fat32_close(struct file *file){
     pool_free(file);
     return 0;
 }
-int fat32_lseek64(struct file *file, long offset, int whence){
+long fat32_lseek64(struct file *file, long offset, int whence){
+    my_uint64_t new_pos;
+    int file_size = fat32_getsize(file->vnode);
 
+    if(!fat32_isdir(file->vnode))
+        return -1;
+
+    switch(whence){
+        case SEEK_SET:
+            new_pos = offset;
+            break;
+        case SEEK_CUR:
+            new_pos = file->f_pos + offset;
+            break;
+        case SEEK_END:
+            new_pos = file_size + offset;
+            break;
+        default:
+            return -1;
+    }
+
+    if(new_pos < 0 || new_pos > file_size)
+        return -1;
+
+    file->f_pos = new_pos;
+
+    return 0;
+}
+
+int fat32_lookup_cache(struct vnode *dir_node, struct vnode **target, const char *component_name){
+    struct fat32_inode *dir_inode = dir_node->internal;
+    fat32_dir_list_t *dir = dir_inode->dir;
+    struct vnode *node;
+    struct fat32_inode *entry;
+    short found = 0;
+
+    list_for_each_entry(entry, &dir->list, list){
+        if(string_comp(entry->name, component_name) == 0){
+            node = entry->vnode;
+            found = 1;
+            break;
+        }
+    }
+
+    if(!found)
+        return -1;
+
+    *target = node;
+
+    return 0;
 }
 
 dir_entry_t *fat32_lookup_dir(struct vnode *dir_node, const char *component_name, char *buf, int *buf_lba){
@@ -142,8 +303,8 @@ dir_entry_t *fat32_lookup_dir(struct vnode *dir_node, const char *component_name
     fat32_info_t *info = dir_inode->info;
     unsigned int cluster_num = dir_inode->cluster_num;
     unsigned int lba;
-    unsigned int offset = 0;
-    unsigned int size = 0;
+    // unsigned int offset = 0;
+    // unsigned int size = 0;
     unsigned int i = 0;
     dir_entry_t *entry;
     file_name_t name;
@@ -273,20 +434,30 @@ int fat32_lookup_no_cache(struct vnode *dir_node, struct vnode **target, const c
     cluster_num = (entry->starthi << 16) | entry->startlow;
 
     if(entry->attr & ATTR_ARCHIVE)
-        type = file_t;
+        type = FAT_FILE;
     else
-        type = dir_t;
+        type = FAT_DIR;
 
     node = fat32_create_vnode(dir_node, component_name, type, cluster_num, entry->size);
     *target = node;
+
+    uart_puts("name:");
+    uart_puts(((struct fat32_inode*)(node->internal))->name);
+    uart_puts("size:");
+    uart_b2x_64(entry->size);
+    uart_puts("\n");
 
     return 0;
 }
 
 int fat32_lookup(struct vnode *dir_node, struct vnode **target, const char *component_name){
-    if(((struct fat32_inode*)dir_node->internal)->type != dir_t){
+    if(((struct fat32_inode*)dir_node->internal)->type != FAT_DIR){
         uart_puts("fat32_lookup: not a directory\n");
         return -1;
+    }
+    if(!fat32_lookup_cache(dir_node, target, component_name)){
+        uart_puts("fat32_lookup: file exists in cache\n");
+        return 0;
     }
     return fat32_lookup_no_cache(dir_node, target, component_name);
 }
@@ -302,7 +473,7 @@ int fat32_create(struct vnode *dir_node, struct vnode **target, const char *comp
         return -1;
     }
 
-    *target = fat32_create_vnode(dir_node,component_name, file_t, -1, 0);
+    *target = fat32_create_vnode(dir_node,component_name, FAT_FILE, -1, 0);
 
     return 0;
 }
@@ -318,7 +489,7 @@ int fat32_mkdir(struct vnode *dir_node, struct vnode **target, const char *compo
         return -1;
     }
 
-    *target = fat32_create_vnode(dir_node, component_name, dir_t, -1, 0);
+    *target = fat32_create_vnode(dir_node, component_name, FAT_DIR, -1, 0);
 
     return 0;
 }
@@ -355,8 +526,8 @@ int fat32_write_file(const void *buf, struct fat32_inode *data, unsigned int off
         else{
             // if the block is not in cache. Read block from sdcard, create cache, then write it
             cluster_num = fat32_get_next_cluster(data->info->fat_lba, cluster_num);
-            if(cluster_num >= 0x0FFFFFF8)
-                break;
+            // if(cluster_num >= 0x0FFFFFF8)
+            //     break;
             ret = fat32_write_disk(data, backoff, buf, buf_offset, size, current_block, cluster_num);
         }
 
@@ -445,7 +616,7 @@ int fat32_write_cache(struct fat32_inode *data, my_uint64_t backoff, const unsig
 }
 // write to cache and make the cache dirty for future sync
 int fat32_write_disk(struct fat32_inode *data, my_uint64_t backoff, const unsigned char *buf, my_uint64_t buf_offset, unsigned int size, unsigned int offset, unsigned int cluster_num){
-    struct list_head *pos = &data->file->list;
+    struct list_head *head = &data->file->list;
     fat32_info_t *info = data->info;
     fat32_cache_metadata_t *metadata = pool_alloc(sizeof(fat32_cache_metadata_t));
     unsigned int lba, write_size;
@@ -471,7 +642,7 @@ int fat32_write_disk(struct fat32_inode *data, my_uint64_t backoff, const unsign
     metadata->offset = offset;
     metadata->cluster_num = cluster_num;
 
-    list_add_tail(&metadata->list, pos);    // add the new block to the end of the cache list
+    list_add_tail(&metadata->list, head);    // add the new block to the end of the cache list
 
     return write_size;
 }
@@ -527,17 +698,17 @@ int fat32_read_disk(struct fat32_inode *data, my_uint64_t backoff, unsigned char
 int fat32_seek_cache(struct fat32_inode *data, unsigned int offset, fat32_cache_metadata_t **metadata){
     fat32_cache_metadata_t *temp;
     // get the list of the 
-    struct list_head *pos = &data->file->list;
+    struct list_head *head = &data->file->list;
 
-    if(list_empty(pos)){
+    if(list_empty(head)){
         uart_puts("fat32_seek_cache: cache list is empty\n");
         return -1;
     }
 
-    list_for_each_entry(temp, pos, list){
-        metadata = temp;
+    list_for_each_entry(temp, head, list){
+        *metadata = temp;
         if(temp->offset == offset){ // if the offset is the same, return the metadata
-            *metadata = temp;
+            //*metadata = temp;
             return 0;
         }
     }
@@ -621,7 +792,7 @@ void fat32_sync_dir(struct vnode *dir_node){
         ori_dir = fat32_lookup_dir(dir_node, name, temp_buf, &buf_lba);
         // if the entry exist(old ffile), update its size
         if(ori_dir){
-            if(entry->type == file_t){
+            if(entry->type == FAT_FILE){
                 ori_dir->size = entry->file->size;
                 writeblock(buf_lba, temp_buf);
             }
@@ -675,7 +846,7 @@ void fat32_sync_dir(struct vnode *dir_node){
 
                 writeblock(lba, buf);
 
-                new_cluster_num = get_next_cluster(data->info->fat_lba, cluster_num);
+                new_cluster_num = fat32_get_next_cluster(data->info->fat_lba, cluster_num);
                 if (new_cluster_num >= 0x0FFFFFF8)
                     new_cluster_num = alloc_cluster(data->info, cluster_num);
                 
@@ -699,7 +870,7 @@ void fat32_sync_dir(struct vnode *dir_node){
 
             for (; ord > 0; --ord) {
                 int end;
-                long_dir = (struct long_dir_t *)(&buf[sizeof(dir_long_entry_t) * index]);
+                long_dir = (dir_long_entry_t *)(&buf[sizeof(dir_long_entry_t) * index]);
 
                 long_dir->order = first | ord;
                 long_dir->attr = ATTR_LONG_NAME;
@@ -757,7 +928,7 @@ void fat32_sync_dir(struct vnode *dir_node){
 
                     writeblock(lba, buf);
 
-                    newcid = get_next_cluster(data->info->fat_lba, cluster_num);
+                    newcid = fat32_get_next_cluster(data->info->fat_lba, cluster_num);
                     if (newcid >= 0x0FFFFFF8) {
                         newcid = alloc_cluster(data->info, cluster_num);
                     }
@@ -773,7 +944,7 @@ void fat32_sync_dir(struct vnode *dir_node){
         }
 
         // Write SFN
-        dir = (struct dir_t *)(&buf[sizeof(dir_entry_t) * index]);
+        dir = (dir_entry_t *)(&buf[sizeof(dir_entry_t) * index]);
 
         // TODO: Set these properties properly
         dir->lcase = 0;
@@ -784,7 +955,7 @@ void fat32_sync_dir(struct vnode *dir_node){
         dir->time = 0;
         dir->date = 0;
 
-        if (entry->type == dir_t) {
+        if (entry->type == FAT_DIR) {
             dir->attr = ATTR_DIRECTORY;
             dir->size = 0;
         } else {
@@ -843,7 +1014,7 @@ void fat32_sync_dir(struct vnode *dir_node){
 
             writeblock(lba, buf);
 
-            newcid = get_next_cluster(data->info->fat_lba, cluster_num);
+            newcid = fat32_get_next_cluster(data->info->fat_lba, cluster_num);
             if (newcid >= 0x0FFFFFF8) {
                 newcid = alloc_cluster(data->info, cluster_num);
             }
@@ -861,9 +1032,58 @@ void fat32_sync_dir(struct vnode *dir_node){
 }
 
 void fat32_sync_file(struct vnode *file_node){
+    fat32_cache_metadata_t *entry;
+    struct fat32_inode *data = (struct fat32_inode*)file_node->internal;
+    struct list_head *head = &data->file->list;
+    unsigned int cluster_num = data->cluster_num;
 
+    if(cluster_num >= 0x0FFFFFF8){
+        uart_puts("fat32_sync_file: end of cluster chain\n");
+        return;
+    }
+    // iterate the file block list
+    list_for_each_entry(entry, head, list){
+        int lba;
+        if(entry->offset == 0){
+            // cache is valid but not sync'd
+            if((entry->cluster_num < 0x0FFFFFF8) && entry->cluster_num != data->cluster_num)
+                uart_puts("fat32_sync_file: cluster number mismatch\n");
+            
+            entry->cluster_num = data->cluster_num;
+        }
+        // 
+        if(entry->cluster_num >= 0x0FFFFFF8)
+            entry->cluster_num = alloc_cluster(data->info, data->cluster_num);
+        
+        if(!entry->dirty)
+            continue;
+        // cache buf is not updated, initialize it to avoid error
+        if(!entry->updated){
+            memset(entry->buf, 0, BLOCK_SIZE);
+            entry->updated = 1;
+        }
+        // sync the cache to the disk
+        lba = data->info->cluster_lba + (entry->cluster_num - 2) * data->info->bs.sectors_per_cluster;
+        writeblock(lba, entry->buf);
+
+        entry->dirty = 0;
+
+        cluster_num = entry->cluster_num;
+    }
 }
 
 void fat32_sync_all(struct vnode *dir_node){
+    struct fat32_inode *data = (struct fat32_inode*)dir_node->internal;
+    struct fat32_inode *entry;
+    struct list_head *head = &data->dir->list;
 
+    fat32_sync_dir(dir_node);
+
+    list_for_each_entry(entry, head, list){
+        // recursive sync to next directory
+        if(entry->type == FAT_DIR)
+            fat32_sync_all(entry->vnode);
+        else
+            fat32_sync_file(entry->vnode);
+    }
 }

@@ -208,9 +208,9 @@ int open(const char *pathname, int flags){
     string_copy(abs_path, (char*)pathname);
     get_absolute_path(abs_path, current_task->curr_working_dir);
 
-    // uart_puts("open: ");
-    // uart_puts(abs_path);
-    // uart_puts("\n");
+    uart_puts("open: ");
+    uart_puts(abs_path);
+    uart_puts("\n");
 
     for(int i = 0; i < MAX_FD; i++){
         // find a empty file descriptor
@@ -383,6 +383,17 @@ int ioctl(int fd, unsigned long request, void *info){
         ((struct framebuffer_info*)info)->isrgb = isrgb;
     }
 
+    current_tf->x0 = 0;
+    return 0;
+}
+
+// syscall number : 20
+int sync(void){
+    for(int i = 0; i < MAX_FS; i++){
+        if(filesystems[i].sync != 0){
+            vfs_sync(&filesystems[i]);
+        }
+    }
     current_tf->x0 = 0;
     return 0;
 }

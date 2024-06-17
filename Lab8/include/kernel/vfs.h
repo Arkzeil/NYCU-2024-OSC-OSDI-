@@ -49,6 +49,7 @@ struct mount{
 struct filesystem{
   const char* name;
   int (*setup_mount)(struct filesystem* fs, struct mount* mount);
+  int (*sync)(struct filesystem* fs);
 };
 
 struct file_operations{
@@ -93,6 +94,7 @@ long vfs_lseek64(struct file* file, long offset, int whence);
 int op_denied(void);
 
 int vfs_mknod(char* pathname, int id);
+int vfs_sync(struct filesystem* fs);
 
 void init_rootfs(void);
 

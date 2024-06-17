@@ -3,6 +3,7 @@
 #include "kernel/initramfs.h"
 #include "kernel/uartfs.h"
 #include "kernel/framebuffer.h"
+#include "kernel/fat32.h"
 
 struct mount* rootfs;
 struct filesystem filesystems[MAX_FS];
@@ -74,6 +75,7 @@ int vfs_open(const char* pathname, int flags, struct file** target) {
   }
   // 2. Create a new file handle for this vnode if found.
   else{
+    uart_puts("file exist, create file handle for the vnode\n");
     *target = (struct file*)pool_alloc(4096);
     // assign the file handle to target
     node->f_ops->open(node, target);
@@ -155,6 +157,10 @@ int vfs_lookup(const char* pathname, struct vnode** target){
   // 2. Starting from rootfs, recursively find vnode of each component
   // 3. Return error code if not found
   // 4. Return found vnode
+  short is_fat = 0;
+  if(pathname[1] == 'b' && pathname[2] == 'o' && pathname[3] == 'o' && pathname[4] == 't')
+    is_fat = 1;
+
   if(string_len(pathname) == 0){
     *target = rootfs->root;
     return 0;
@@ -170,11 +176,14 @@ int vfs_lookup(const char* pathname, struct vnode** target){
       component_name[component_index++] = '\0';
       // To see if we can find the vnode of the component
       // If not, return -1
-      if(dir_node->v_ops->lookup(dir_node, &dir_node, component_name))
+      if(dir_node->v_ops->lookup(dir_node, &dir_node, component_name) != 0)
         return -1;
       // If the vnode is a mount point, go to the root of the mounted fs
-      while(dir_node->mount)
+      while(dir_node->mount){
         dir_node = dir_node->mount->root;
+        if(is_fat)    // as fat32 will make the mount of the vnode of mounting point point to mount -> recursive 
+          break;
+      }
       // Get next component name
       component_index = 0;
     }
@@ -187,9 +196,11 @@ int vfs_lookup(const char* pathname, struct vnode** target){
   if(dir_node->v_ops->lookup(dir_node, &dir_node, component_name))
     return -1;
 
-  while(dir_node->mount)
+  while(dir_node->mount){
     dir_node = dir_node->mount->root;
-
+    if(is_fat)    // as fat32 will make the mount of the vnode of mounting point point to mount -> recursive 
+      break;
+  }
   *target = dir_node;
   return 0;
 }
@@ -223,6 +234,10 @@ int vfs_mknod(char* pathname, int id){
   return 0;
 }
 
+int vfs_sync(struct filesystem* fs){
+  return fs->sync(fs);
+}
+
 void init_rootfs(void){
   sd_init();
 
@@ -235,6 +250,8 @@ void init_rootfs(void){
   vfs_mount("/initramfs", "initramfs");
 
   vfs_mkdir("/boot");
+  fat32_register();
+  vfs_mount("/boot", "fat32");
 
   // create /dev directory
   vfs_mkdir("/dev");

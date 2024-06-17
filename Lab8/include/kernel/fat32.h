@@ -6,6 +6,9 @@
 #include "kernel/sdhost.h"
 #include "kernel/fat32_utils.h"
 
+// type of struct fat32_inode
+#define FAT_DIR     1
+#define FAT_FILE    2
 // ref: https://hackmd.io/@qy8LSFGCTDuQxhmEoSZjKQ/B1GPtg3YO
 
 #define BLOCK_SIZE 512
@@ -119,9 +122,9 @@ typedef struct fat32_cluster_entry{
 
 typedef struct file_name{
     union {
-        unsigned char full_name[256];
+        char full_name[256];
         struct{
-            unsigned char name[13];
+            char name[13];
         } part[20];  
     };
 }__attribute__((packed)) file_name_t;
@@ -169,12 +172,13 @@ int fat32_register();
 int fat32_setup_mount(struct filesystem *fs, struct mount *mount);
 
 struct vnode* fat32_create_vnode(struct vnode* parent, const char *name, unsigned int type, unsigned int cluster_num, unsigned int size);
+int alloc_cluster(fat32_info_t *info, unsigned int prev_cluster_num);
 
 int fat32_write(struct file *file, const void *buf, my_uint64_t len);
 int fat32_read(struct file *file, void *buf, my_uint64_t len);
 int fat32_open(struct vnode *file_node, struct file **target);
 int fat32_close(struct file *file);
-int fat32_lseek64(struct file *file, long offset, int whence);
+long fat32_lseek64(struct file *file, long offset, int whence);
 
 int fat32_lookup(struct vnode *dir_node, struct vnode **target, const char *component_name);
 int fat32_create(struct vnode *dir_node, struct vnode **target, const char *component_name);

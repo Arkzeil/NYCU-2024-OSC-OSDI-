@@ -62,4 +62,7 @@ long lseek64(int fd, long offset, int whence);
 // syscall number : 19
 int ioctl(int fd, unsigned long request, void *info);
 
+// syscall number : 20
+int sync(void);
+
 #endif
