@@ -11,8 +11,8 @@ long fat32_getsize(struct vnode *vd){
         uart_puts("fat32_getsize: Cannot get size of a directory\n");
         return 0;
     }
-    uart_puts("fat32_getsize: ");
-    uart_b2x_64(((struct fat32_inode*)(vd->internal))->file->size);
+    // uart_puts("fat32_getsize: ");
+    // uart_b2x_64(((struct fat32_inode*)(vd->internal))->file->size);
     return ((struct fat32_inode*)(vd->internal))->file->size;
 }
 

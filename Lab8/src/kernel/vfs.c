@@ -75,7 +75,7 @@ int vfs_open(const char* pathname, int flags, struct file** target) {
   }
   // 2. Create a new file handle for this vnode if found.
   else{
-    uart_puts("file exist, create file handle for the vnode\n");
+    //uart_puts("file exist, create file handle for the vnode\n");
     *target = (struct file*)pool_alloc(4096);
     // assign the file handle to target
     node->f_ops->open(node, target);
@@ -197,9 +197,9 @@ int vfs_lookup(const char* pathname, struct vnode** target){
     return -1;
 
   while(dir_node->mount){
-    dir_node = dir_node->mount->root;
     if(is_fat)    // as fat32 will make the mount of the vnode of mounting point point to mount -> recursive 
       break;
+    dir_node = dir_node->mount->root;
   }
   *target = dir_node;
   return 0;

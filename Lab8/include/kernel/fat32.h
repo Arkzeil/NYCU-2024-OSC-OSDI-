@@ -6,9 +6,6 @@
 #include "kernel/sdhost.h"
 #include "kernel/fat32_utils.h"
 
-// type of struct fat32_inode
-#define FAT_DIR     1
-#define FAT_FILE    2
 // ref: https://hackmd.io/@qy8LSFGCTDuQxhmEoSZjKQ/B1GPtg3YO
 
 #define BLOCK_SIZE 512
@@ -184,6 +181,7 @@ int fat32_lookup(struct vnode *dir_node, struct vnode **target, const char *comp
 int fat32_create(struct vnode *dir_node, struct vnode **target, const char *component_name);
 int fat32_mkdir(struct vnode *dir_node, struct vnode **target, const char *component_name);
 
+int fat32_sync(struct filesystem* fs);
 void fat32_sync_dir(struct vnode *dir_node);
 void fat32_sync_file(struct vnode *file_node);
 void fat32_sync_all(struct vnode *dir_node);
