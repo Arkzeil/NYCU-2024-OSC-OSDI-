@@ -1,13 +1,17 @@
 CROSS_PLATFORM = aarch64-linux-gnu
 CC = gcc
 KERNEL = kernel8
+# Find all versioned directories under /usr/lib/gcc-cross/aarch64-linux-gnu/
+GCC_CROSS_DIRS := $(wildcard /usr/lib/gcc-cross/$(CROSS_PLATFORM)/*)
+# Sort them numerically, pick the last (highest) one
+GCC_CROSS_VERSION := $(notdir $(lastword $(sort $(GCC_CROSS_DIRS))))
 # -nostdlib Don't use the C standard library. 
 # -nostartfiles Don't use standard startup files. Startup files are responsible for setting an initial stack pointer, initializing static data, and jumping to the main entry point. 
 # -ffreestanding A freestanding environment is an environment in which the standard library may not exist, and program startup may not necessarily be at main. The option -ffreestanding directs the compiler to not assume that standard functions have their usual definition.
 # -mgeneral-regs-only. Use only general-purpose registers. ARM processors also have NEON registers. We don't want the compiler to use them because they add additional complexity 
 # -nostdinc Do not search for system include library
 CFLAGS =  -Wall -nostdlib -nostartfiles -ffreestanding -nostdinc -Iinclude -mgeneral-regs-only -g
-CFLAGS += -I /usr/lib/gcc-cross/aarch64-linux-gnu/11/include
+CFLAGS += -I /usr/lib/gcc-cross/aarch64-linux-gnu/$(GCC_CROSS_VERSION)/include
 # -Iinclude Search for header files in the include folder.
 
 KER_SRC = ./src/kernel
